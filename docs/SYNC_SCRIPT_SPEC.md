@@ -93,5 +93,5 @@ upserting the current ones, so closed positions disappear from the list.
 ## Suggested loop
 
 Since the VPS runs 24/7, mirror `collector.py`'s own pattern: a `while True:` loop
-with a `time.sleep(300)` (5 min) between passes, wrapped in try/except so one
+with a `time.sleep(60)` (1 min) between passes, wrapped in try/except so one
 failed pass doesn't kill the process.

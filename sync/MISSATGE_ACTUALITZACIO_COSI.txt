@@ -1,0 +1,17 @@
+Hola! Cal actualitzar l'script del VPS, 2 passos ràpids:
+
+1. Atura l'script que tens corrent ara (tanca la finestra o Ctrl+C).
+
+2. Substitueix el fitxer "sync_mt5_to_supabase.py" per la versió nova que et passo
+   (mateixa carpeta, mateix .env, no cal tocar res més).
+
+3. Torna'l a engegar igual que sempre:
+   python sync_mt5_to_supabase.py
+
+Ha de sortir el mateix missatge de sempre:
+   Connected to MT5 account 730432938, syncing every 60s.
+   Sync pass OK.
+
+Si surt algun error, envia'm una captura i ho miro.
+
+Gràcies!

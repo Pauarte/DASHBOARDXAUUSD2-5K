@@ -37,7 +37,7 @@ Pas 4 - Executar l'script
     python sync_mt5_to_supabase.py
 
 Ha de sortir un missatge com:
-    Connected to MT5 account 730432938, syncing every 300s.
+    Connected to MT5 account 730432938, syncing every 60s.
     Sync pass OK.
 
 Si en canvi surt un error, copia'l tal qual i el revisem.
