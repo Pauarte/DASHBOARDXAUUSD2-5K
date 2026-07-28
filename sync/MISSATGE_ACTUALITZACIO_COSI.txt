@@ -1,36 +1,21 @@
-Hola! Dues coses per acabar de quadrar-ho tot:
+Hola! T'he preparat un script perquè actualitzar-ho sigui més fàcil a
+partir d'ara. Només cal fer-ho un cop:
 
-1) EXECUTAR AQUEST SQL A SUPABASE (SQL Editor), és per la taula dels teus
-   informes d'anàlisi que encara no existeix:
+1) Desa el fitxer adjunt "actualitza_i_engega.ps1" a la MATEIXA carpeta on
+   tens "sync_mt5_to_supabase.py" i el ".env" (al VPS).
 
-create table if not exists analysis_reports (
-  id bigint generated always as identity primary key,
-  bot_id text not null,
-  report_date date not null,
-  period text not null check (period in ('daily', 'weekly', 'monthly')),
-  title text not null,
-  content text not null,
-  source text not null default 'scheduled-chat',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (bot_id, report_date, period)
-);
+2) Atura l'script que tinguis corrent ara (Ctrl+C o tanca la finestra).
 
-create index if not exists analysis_reports_bot_date_idx
-  on analysis_reports (bot_id, report_date desc);
+3) Obre PowerShell en aquella carpeta i executa:
 
-alter table analysis_reports enable row level security;
+   powershell -ExecutionPolicy Bypass -File actualitza_i_engega.ps1
 
-create policy "public read analysis_reports" on analysis_reports for select using (true);
+   Això baixa sol la darrera versió del script des de GitHub, instal·la
+   el que calgui i l'engega. El teu .env no es toca.
 
-2) ACTUALITZAR L'SCRIPT DEL VPS (adjunt sync_mt5_to_supabase.py):
-   - He arreglat un bug: les operacions que MT5 tanca amb un magic number
-     diferent al d'obertura no es sincronitzaven mai (per això en faltaven
-     algunes a l'historial).
-   - Atura l'script que tens corrent (Ctrl+C o tanca la finestra).
-   - Substitueix "sync_mt5_to_supabase.py" per aquest nou (mateix .env, no
-     cal tocar res més).
-   - Torna'l a engegar: python sync_mt5_to_supabase.py
+A partir d'ara, cada vegada que et digui "hi ha una actualització", només
+cal repetir el pas 3 (tornar a executar el mateix .ps1) — ja no cal que et
+passi el fitxer .py a mà cada cop.
 
 Ha de sortir:
    Connected to MT5 account 730432938, syncing every 60s.
