@@ -1,22 +1,32 @@
-Hola! T'he preparat 2 fitxers perquè actualitzar-ho sigui més fàcil a
-partir d'ara (només cal fer-ho un cop):
+Hola! Aquesta és la darrera vegada que t'he de demanar que facis res
+manualment al VPS — a partir d'ara tot va sol, sense doble clics ni
+que hagis d'estar pendent:
 
-1) Desa els dos fitxers adjunts, "actualitza.bat" i "actualitza_i_engega.ps1",
-   a la MATEIXA carpeta on tens "sync_mt5_to_supabase.py" i el ".env" (al VPS).
+1) Desa aquests 3 fitxers adjunts a la mateixa carpeta on tens
+   "sync_mt5_to_supabase.py" i el ".env" (substitueix el .py antic):
+   - sync_mt5_to_supabase.py
+   - actualitza_i_engega.ps1
+   - configura_reinici_automatic.ps1
 
 2) Atura l'script que tinguis corrent ara (Ctrl+C o tanca la finestra).
 
-3) Fes doble clic sobre "actualitza.bat".
+3) Obre PowerShell COM A ADMINISTRADOR en aquella carpeta (clic dret al
+   botó d'inici -> "Windows PowerShell (Admin)", i després navega a la
+   carpeta amb "cd" fins on tens els fitxers) i executa:
 
-   Ell sol baixa la darrera versió des de GitHub, instal·la el que calgui
-   i l'engega. El teu .env no es toca. No cal escriure res.
+   powershell -ExecutionPolicy Bypass -File configura_reinici_automatic.ps1
 
-A partir d'ara, cada vegada que et digui "hi ha una actualització", només
-cal tornar a fer doble clic sobre "actualitza.bat" — ja no cal que et
-passi cap fitxer nou a mà.
+   Això deixa configurat que Windows vigili l'script tot sol: si mai es
+   para (es penja, es reinicia el VPS, es tanca la finestra sense voler...)
+   es torna a engegar automàticament en menys d'1 minut.
 
-Ha de sortir:
-   Connected to MT5 account 730432938, syncing every 60s.
-   Sync pass OK.
+I ja està — a partir d'aquí:
+   - Si l'script es para per qualsevol motiu -> es reengega sol.
+   - Si jo faig un canvi nou al codi -> l'script se n'adona sol (mira
+     GitHub cada 5 passades) i s'actualitza i reinicia ell mateix.
+   - Ja no t'he de tornar a enviar cap fitxer ni demanar que facis res.
 
-Si surt algun error, envia'm una captura. Gràcies!
+Si en algun moment vols comprovar que va bé, mira si hi ha una finestra
+oberta amb missatges "Sync pass OK." cada minut.
+
+Gràcies per tota la paciència amb això!

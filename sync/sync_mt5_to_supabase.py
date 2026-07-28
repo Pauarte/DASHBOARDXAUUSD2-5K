@@ -15,7 +15,9 @@ Setup on the VPS:
 
 import datetime
 import os
+import sys
 import time
+import urllib.request
 from collections import defaultdict
 
 import MetaTrader5 as mt5
@@ -33,6 +35,16 @@ MAGIC_FILTER = int(os.environ["MT5_MAGIC_NUMBER"])
 SYMBOL_FILTER = "XAUUSD"
 POLL_SECONDS = 60
 HISTORY_LOOKBACK_DAYS = 30
+
+# Self-update: check GitHub for a newer version of this file every N passes,
+# and if it changed, overwrite this file on disk and restart the process —
+# so pushing a fix means the VPS picks it up on its own within a few
+# minutes, no manual copy/paste or double-click needed.
+SELF_UPDATE_URL = (
+    "https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/sync_mt5_to_supabase.py"
+)
+SELF_UPDATE_EVERY_N_PASSES = 5
+SELF_PATH = os.path.abspath(__file__)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -185,9 +197,28 @@ def record_floating_snapshot():
     ).execute()
 
 
+def check_for_update():
+    try:
+        with urllib.request.urlopen(SELF_UPDATE_URL, timeout=10) as resp:
+            remote_code = resp.read()
+    except Exception as exc:
+        print(f"Update check failed (ignoring): {exc}")
+        return
+
+    with open(SELF_PATH, "rb") as f:
+        local_code = f.read()
+
+    if remote_code and remote_code != local_code:
+        print("New version available — updating and restarting…")
+        with open(SELF_PATH, "wb") as f:
+            f.write(remote_code)
+        os.execv(sys.executable, [sys.executable, SELF_PATH])
+
+
 def main():
     connect()
     print(f"Connected to MT5 account {ACCOUNT_LOGIN}, syncing every {POLL_SECONDS}s.")
+    pass_count = 0
     while True:
         try:
             sync_closed_trades()
@@ -197,6 +228,11 @@ def main():
             print("Sync pass OK.")
         except Exception as exc:  # one bad pass must not kill the loop
             print(f"Sync pass failed: {exc}")
+
+        pass_count += 1
+        if pass_count % SELF_UPDATE_EVERY_N_PASSES == 0:
+            check_for_update()
+
         time.sleep(POLL_SECONDS)
 
 
