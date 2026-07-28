@@ -1,0 +1,13 @@
+Hola! Per connectar el dashboard amb el compte MT5 live (730432938) necessito
+dues dades del bot que tens al VPS:
+
+1. El "magic number" del bot (l'identificador numeric que fa servir per marcar
+   les seves operacions). Surt al codi font de l'EA/script, normalment en una
+   linia com "input int Magic = 12345;" o similar.
+
+2. La ruta del terminal MT5 al VPS (el fitxer terminal64.exe), per exemple:
+   C:\Program Files\MetaTrader 5\terminal64.exe
+   (o la carpeta on tens instal·lat el MT5 d'aquell compte, si en tens mes d'un).
+
+Amb aixo ja podem connectar-ho tot des d'aqui, no cal que toquis res mes al VPS
+de moment.

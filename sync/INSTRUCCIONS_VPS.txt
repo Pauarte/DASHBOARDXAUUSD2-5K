@@ -1,0 +1,53 @@
+Instruccions per posar en marxa la sincronitzacio al VPS
+==========================================================
+
+Aquesta carpeta "sync" conte tot el necessari. El fitxer .env ja te les
+claus reals a dins (compte de Supabase i dades del bot), aixi que un cop
+copiada la carpeta al VPS no cal editar res mes.
+
+IMPORTANT: aquesta carpeta conte una clau secreta (.env). No la enviis per
+un canal public. Un zip enviat directament pel xat privat, o per WeTransfer/
+Google Drive amb enllac privat, esta be.
+
+Pas 1 - Copiar la carpeta al VPS
+---------------------------------
+Per RDP: obre la connexio al VPS, i enganxa-hi la carpeta "sync" sencera
+(per exemple a l'escriptori, o a C:\sync). Si el RDP no permet copiar
+carpetes directament, comprimeix "sync" en un .zip, envia'l (WeTransfer,
+Drive, etc.), i descomprimeix'l dins del VPS.
+
+Pas 2 - Comprovar que hi ha Python instal·lat
+-----------------------------------------------
+Dins del VPS, obre "cmd" o "PowerShell" i escriu:
+
+    python --version
+
+Si dona un numero de versio (3.x), ja el tens. Si diu que no reconeix la
+comanda, cal instal·lar-lo primer des de https://www.python.org/downloads/
+(marcar la casella "Add python.exe to PATH" durant la instal·lacio).
+
+Pas 3 - Instal·lar les dependencies
+-------------------------------------
+Dins de la carpeta sync (per exemple "cd C:\sync" o "cd Desktop\sync"):
+
+    pip install -r requirements.txt
+
+Pas 4 - Executar l'script
+----------------------------
+    python sync_mt5_to_supabase.py
+
+Ha de sortir un missatge com:
+    Connected to MT5 account 730432938, syncing every 300s.
+    Sync pass OK.
+
+Si en canvi surt un error, copia'l tal qual i el revisem.
+
+Pas 5 - Deixar-ho corrent 24/7
+---------------------------------
+El VPS ja esta ences tot el dia, aixi que de moment n'hi ha prou amb deixar
+aquesta finestra oberta (no la tanquis). Si el VPS es reinicia algun dia,
+cal tornar a fer el Pas 4 manualment.
+
+(Mes endavant, si voleu que es reengegui sol despres d'un reinici del VPS,
+es pot configurar com a tasca del Task Scheduler de Windows — ho podem fer
+quan arribi el moment, no cal ara.)
