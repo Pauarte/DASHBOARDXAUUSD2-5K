@@ -1,13 +1,13 @@
 {
-  "name": "XAUUSD Trading Dashboard",
-  "short_name": "XAUUSD Dashboard",
+  "name": "Monitor Bots Trading",
+  "short_name": "Monitor Bots",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d0d0d",
   "theme_color": "#0d0d0d",
   "lang": "ca",
-  "description": "Seguiment de lectura del bot de trading",
+  "description": "Monitor de lectura dels bots de trading",
   "icons": [
-    {"src":"/icon.svg","sizes":"512x512","type":"image/svg+xml","purpose":"any maskable"}
+    {"src":"/icon.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
   ]
 }
