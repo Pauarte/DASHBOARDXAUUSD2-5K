@@ -9,10 +9,9 @@ import { DailyPnlChart } from './components/DailyPnlChart'
 import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
-import { AnalysisSection } from './components/AnalysisSection'
 
 function App() {
-  const { trades, openPositions, account, isLive, loading, worstFloating, reports } = useAccountData()
+  const { trades, openPositions, account, isLive, loading, worstFloating } = useAccountData()
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = useMemo(
@@ -112,7 +111,6 @@ function App() {
         </section>
 
         <CalendarHeatmap trades={trades} />
-        <AnalysisSection reports={reports} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">

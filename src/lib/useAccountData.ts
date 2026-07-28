@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 import { mockAccount, mockOpenPositions, mockTrades } from './mockData'
-import type { AccountSnapshot, AnalysisReport, Direction, ExitReason, OpenPosition, Trade } from './types'
+import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from './types'
 
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
 const REFRESH_INTERVAL_MS = 30_000
@@ -18,7 +18,6 @@ interface AccountData {
   isLive: boolean
   loading: boolean
   worstFloating: WorstFloating | null
-  reports: AnalysisReport[]
 }
 
 const FALLBACK: AccountData = {
@@ -28,7 +27,6 @@ const FALLBACK: AccountData = {
   isLive: false,
   loading: false,
   worstFloating: null,
-  reports: [],
 }
 
 interface TradeRow {
@@ -70,7 +68,7 @@ export function useAccountData(): AccountData {
     let cancelled = false
 
     async function load() {
-      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes, reportsRes] = await Promise.all([
+      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes] = await Promise.all([
         supabase!
           .from('trades')
           .select('id, direction, lots, entry_price, exit_price, open_time, close_time, pnl, exit_reason')
@@ -93,21 +91,14 @@ export function useAccountData(): AccountData {
             (res) => res,
             () => ({ data: null, error: null }),
           ),
-        supabase!.from('analysis_reports').select('id, bot_id, report_date, period, title, content, updated_at').eq('bot_id', ACCOUNT_ID).order('report_date', { ascending: false }),
       ])
 
       if (cancelled) return
 
       const tradeRows = (tradesRes.data as TradeRow[] | null) ?? []
-      const reports: AnalysisReport[] = ((reportsRes.data as Array<Record<string, unknown>> | null) ?? []).map((r) => ({
-        id: Number(r.id), botId: String(r.bot_id), reportDate: String(r.report_date),
-        period: r.period as AnalysisReport['period'], title: String(r.title),
-        content: String(r.content), updatedAt: String(r.updated_at),
-      }))
-
       if (tradeRows.length === 0 || !snapshotRes.data) {
         // the sync script hasn't written any data for this account yet
-        setData({ ...FALLBACK, reports, loading: false })
+        setData({ ...FALLBACK, loading: false })
         return
       }
 
@@ -164,7 +155,6 @@ export function useAccountData(): AccountData {
         isLive: true,
         loading: false,
         worstFloating,
-        reports,
       })
     }
 
