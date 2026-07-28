@@ -1,21 +1,19 @@
-Hola! T'he preparat un script perquè actualitzar-ho sigui més fàcil a
-partir d'ara. Només cal fer-ho un cop:
+Hola! T'he preparat 2 fitxers perquè actualitzar-ho sigui més fàcil a
+partir d'ara (només cal fer-ho un cop):
 
-1) Desa el fitxer adjunt "actualitza_i_engega.ps1" a la MATEIXA carpeta on
-   tens "sync_mt5_to_supabase.py" i el ".env" (al VPS).
+1) Desa els dos fitxers adjunts, "actualitza.bat" i "actualitza_i_engega.ps1",
+   a la MATEIXA carpeta on tens "sync_mt5_to_supabase.py" i el ".env" (al VPS).
 
 2) Atura l'script que tinguis corrent ara (Ctrl+C o tanca la finestra).
 
-3) Obre PowerShell en aquella carpeta i executa:
+3) Fes doble clic sobre "actualitza.bat".
 
-   powershell -ExecutionPolicy Bypass -File actualitza_i_engega.ps1
-
-   Això baixa sol la darrera versió del script des de GitHub, instal·la
-   el que calgui i l'engega. El teu .env no es toca.
+   Ell sol baixa la darrera versió des de GitHub, instal·la el que calgui
+   i l'engega. El teu .env no es toca. No cal escriure res.
 
 A partir d'ara, cada vegada que et digui "hi ha una actualització", només
-cal repetir el pas 3 (tornar a executar el mateix .ps1) — ja no cal que et
-passi el fitxer .py a mà cada cop.
+cal tornar a fer doble clic sobre "actualitza.bat" — ja no cal que et
+passi cap fitxer nou a mà.
 
 Ha de sortir:
    Connected to MT5 account 730432938, syncing every 60s.
