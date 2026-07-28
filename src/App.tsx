@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
 import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
 import { useAccountData } from './lib/useAccountData'
@@ -9,10 +9,25 @@ import { DailyPnlChart } from './components/DailyPnlChart'
 import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
-import { AnalysisSection } from './components/AnalysisSection'
 
 function App() {
-  const { trades, openPositions, account, isLive, loading, worstFloating, reports } = useAccountData()
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  useEffect(() => {
+    const handler = (event: Event) => {
+      event.preventDefault()
+      setInstallPrompt(event as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function installApp() {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    setInstallPrompt(null)
+  }
+
+  const { trades, openPositions, account, isLive, loading, worstFloating } = useAccountData()
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = useMemo(
@@ -54,6 +69,7 @@ function App() {
           </div>
         </div>
       </header>
+      {installPrompt && <button onClick={installApp} className="fixed bottom-4 right-4 z-10 rounded-full border border-[var(--border)] bg-[var(--surface-card)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] shadow-lg hover:text-[var(--text-primary)]">Instal·lar app</button>}
 
       <main className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
         <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -112,7 +128,6 @@ function App() {
         </section>
 
         <CalendarHeatmap trades={trades} />
-        <AnalysisSection reports={reports} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
@@ -123,6 +138,10 @@ function App() {
       </main>
     </div>
   )
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
 }
 
 export default App
