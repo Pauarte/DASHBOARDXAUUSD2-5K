@@ -1,18 +1,22 @@
 Hola! Aquesta és la darrera vegada que t'he de demanar que facis res
 manualment al VPS — a partir d'ara tot va sol, sense doble clics ni
-que hagis d'estar pendent:
+que hagis d'estar pendent.
 
-1) Desa aquests 3 fitxers adjunts a la mateixa carpeta on tens
-   "sync_mt5_to_supabase.py" i el ".env" (substitueix el .py antic):
-   - sync_mt5_to_supabase.py
-   - actualitza_i_engega.ps1
-   - configura_reinici_automatic.ps1
+Descarrega't aquests 3 fitxers (obre el link, i fes Ctrl+S o clic dret ->
+"Guardar com..." per desar-los):
+
+  https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/sync_mt5_to_supabase.py
+  https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/actualitza_i_engega.ps1
+  https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/configura_reinici_automatic.ps1
+
+1) Desa'ls tots 3 a la mateixa carpeta on tens "sync_mt5_to_supabase.py" i
+   el ".env" (substitueix el .py antic pel nou).
 
 2) Atura l'script que tinguis corrent ara (Ctrl+C o tanca la finestra).
 
 3) Obre PowerShell COM A ADMINISTRADOR en aquella carpeta (clic dret al
-   botó d'inici -> "Windows PowerShell (Admin)", i després navega a la
-   carpeta amb "cd" fins on tens els fitxers) i executa:
+   botó d'inici -> "Windows PowerShell (Admin)", i navega amb "cd" fins a
+   la carpeta) i executa:
 
    powershell -ExecutionPolicy Bypass -File configura_reinici_automatic.ps1
 
