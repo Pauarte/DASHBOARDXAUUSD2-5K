@@ -1,36 +1,30 @@
-Hola! Aquesta és la darrera vegada que t'he de demanar que facis res
-manualment al VPS — a partir d'ara tot va sol, sense doble clics ni
-que hagis d'estar pendent.
+Hola! He adaptat l'script perquè funcioni amb la tasca "MT5-Supabase-Sync"
+que ja teniu configurada al VPS -- no en crea cap de nova, no toca la seva
+configuració (reinici automàtic inclòs), no mata cap altre procés, i no
+deixa cap finestra de PowerShell oberta.
 
-Descarrega't aquests 3 fitxers (obre el link, i fes Ctrl+S o clic dret ->
-"Guardar com..." per desar-los):
+1) Descarrega't aquest fitxer i desa'l a la mateixa carpeta on tens
+   "sync_mt5_to_supabase.py" i el ".env":
 
-  https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/sync_mt5_to_supabase.py
-  https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/actualitza_i_engega.ps1
-  https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/configura_reinici_automatic.ps1
+   https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/actualitza_tasca_existent.ps1
 
-1) Desa'ls tots 3 a la mateixa carpeta on tens "sync_mt5_to_supabase.py" i
-   el ".env" (substitueix el .py antic pel nou).
+2) Obre PowerShell en aquella carpeta i executa:
 
-2) Atura l'script que tinguis corrent ara (Ctrl+C o tanca la finestra).
+   powershell -ExecutionPolicy Bypass -File actualitza_tasca_existent.ps1
 
-3) Obre PowerShell COM A ADMINISTRADOR en aquella carpeta (clic dret al
-   botó d'inici -> "Windows PowerShell (Admin)", i navega amb "cd" fins a
-   la carpeta) i executa:
+Què fa exactament:
+   - Comprova que existeix la tasca "MT5-Supabase-Sync". Si no la troba
+     amb aquest nom exacte, s'atura sense tocar res.
+   - Baixa la darrera versió de "sync_mt5_to_supabase.py" des de GitHub.
+   - Atura NOMÉS aquesta tasca (Stop-ScheduledTask), substitueix el
+     fitxer, i la torna a engegar (Start-ScheduledTask).
+   - El .env i la configuració de la tasca (reinici automàtic, etc.) no
+     es toquen per a res.
 
-   powershell -ExecutionPolicy Bypass -File configura_reinici_automatic.ps1
+A partir d'ara, cada vegada que hi hagi una actualització, només cal
+tornar a executar aquest mateix .ps1 -- i, a més, l'script mateix mira
+GitHub cada 5 passades i s'actualitza sol si detecta una versió nova,
+substituint-se ell mateix de manera segura sense crear cap procés extra.
 
-   Això deixa configurat que Windows vigili l'script tot sol: si mai es
-   para (es penja, es reinicia el VPS, es tanca la finestra sense voler...)
-   es torna a engegar automàticament en menys d'1 minut.
-
-I ja està — a partir d'aquí:
-   - Si l'script es para per qualsevol motiu -> es reengega sol.
-   - Si jo faig un canvi nou al codi -> l'script se n'adona sol (mira
-     GitHub cada 5 passades) i s'actualitza i reinicia ell mateix.
-   - Ja no t'he de tornar a enviar cap fitxer ni demanar que facis res.
-
-Si en algun moment vols comprovar que va bé, mira si hi ha una finestra
-oberta amb missatges "Sync pass OK." cada minut.
-
-Gràcies per tota la paciència amb això!
+Login (730432938), símbol (XAUUSD) i magic number (20260723122) no
+canvien -- surten del vostre .env, que no es toca.
