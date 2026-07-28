@@ -4,6 +4,7 @@ import { mockAccount, mockOpenPositions, mockTrades } from './mockData'
 import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from './types'
 
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
+const REFRESH_INTERVAL_MS = 30_000
 
 export interface WorstFloating {
   value: number
@@ -157,13 +158,21 @@ export function useAccountData(): AccountData {
       })
     }
 
-    load().catch((error) => {
-      console.error('Failed to load Supabase account data, falling back to demo data', error)
-      if (!cancelled) setData({ ...FALLBACK, loading: false })
-    })
+    function loadAndCatch() {
+      load().catch((error) => {
+        console.error('Failed to load Supabase account data, falling back to demo data', error)
+        if (!cancelled) setData({ ...FALLBACK, loading: false })
+      })
+    }
+
+    loadAndCatch()
+    // The VPS syncs every 60s — poll a bit faster so the open dashboard tab
+    // picks up new trades / floating P&L without needing a manual reload.
+    const interval = setInterval(loadAndCatch, REFRESH_INTERVAL_MS)
 
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
   }, [])
 

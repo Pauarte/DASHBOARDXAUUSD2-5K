@@ -58,9 +58,14 @@ def sync_closed_trades():
     if deals is None:
         deals = ()
 
+    # Group by symbol only here — MT5 sometimes tags the closing deal with a
+    # different (or zero) magic number than the opening deal, so filtering
+    # every deal by MAGIC_FILTER can silently drop the exit leg and make a
+    # fully closed position never show up. Magic is checked below, on the
+    # entry deal only, since that's what identifies "this bot opened it".
     by_position = defaultdict(list)
     for d in deals:
-        if d.symbol != SYMBOL_FILTER or d.magic != MAGIC_FILTER:
+        if d.symbol != SYMBOL_FILTER:
             continue
         by_position[d.position_id].append(d)
 
@@ -74,6 +79,8 @@ def sync_closed_trades():
         ]
         if not entries or not exits:
             continue  # not a fully closed position
+        if entries[0].magic != MAGIC_FILTER:
+            continue  # not opened by this bot
 
         entry_volume = sum(d.volume for d in entries)
         exit_volume = sum(d.volume for d in exits)
