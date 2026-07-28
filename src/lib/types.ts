@@ -35,3 +35,15 @@ export interface AccountSnapshot {
   currency: string
   symbol: string
 }
+
+export type ReportPeriod = 'daily' | 'weekly' | 'monthly'
+
+export interface AnalysisReport {
+  id: number
+  botId: string
+  reportDate: string
+  period: ReportPeriod
+  title: string
+  content: string
+  updatedAt: string
+}
