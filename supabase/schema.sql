@@ -43,12 +43,28 @@ create table if not exists account_snapshots (
   updated_at timestamptz not null default now()
 );
 
+-- One row per sync pass (never overwritten), so we can find the worst
+-- floating P&L the account has ever been exposed to, and when it happened.
+create table if not exists floating_pnl_snapshots (
+  id bigint generated always as identity primary key,
+  account text not null,
+  floating_pnl numeric not null,
+  equity numeric not null,
+  balance numeric not null,
+  recorded_at timestamptz not null default now()
+);
+
+create index if not exists floating_pnl_snapshots_account_recorded_idx
+  on floating_pnl_snapshots (account, recorded_at);
+
 -- Public dashboard uses the anon key: allow it to read, never to write.
 -- The sync script uses the service_role key instead, which bypasses RLS.
 alter table trades enable row level security;
 alter table open_positions enable row level security;
 alter table account_snapshots enable row level security;
+alter table floating_pnl_snapshots enable row level security;
 
 create policy "public read trades" on trades for select using (true);
 create policy "public read open_positions" on open_positions for select using (true);
 create policy "public read account_snapshots" on account_snapshots for select using (true);
+create policy "public read floating_pnl_snapshots" on floating_pnl_snapshots for select using (true);

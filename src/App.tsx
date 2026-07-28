@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
-import { formatCurrency, formatPercent } from './lib/format'
+import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
 import { useAccountData } from './lib/useAccountData'
 import { StatTile } from './components/StatTile'
 import { EquityCurveChart } from './components/EquityCurveChart'
@@ -11,7 +11,7 @@ import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
 
 function App() {
-  const { trades, openPositions, account, isLive, loading } = useAccountData()
+  const { trades, openPositions, account, isLive, loading, worstFloating } = useAccountData()
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = useMemo(
@@ -64,6 +64,12 @@ function App() {
             tone={floatingPnl >= 0 ? 'good' : 'critical'}
           />
           <StatTile
+            label="Worst floating ever"
+            value={worstFloating ? formatCurrency(worstFloating.value, { signed: true }) : '—'}
+            sub={worstFloating ? formatDateTime(worstFloating.at) : 'Tracking starts now'}
+            tone="critical"
+          />
+          <StatTile
             label="Today's P&L"
             value={formatCurrency(stats.todayPnl, { signed: true })}
             tone={stats.todayPnl >= 0 ? 'good' : 'critical'}
@@ -90,7 +96,6 @@ function App() {
             value={formatCurrency(stats.avgWin, { signed: true })}
             sub={formatCurrency(-stats.avgLoss, { signed: true })}
           />
-          <StatTile label="Expectancy / trade" value={formatCurrency(stats.expectancy, { signed: true })} />
           <StatTile
             label="Total P&L"
             value={formatCurrency(stats.totalPnl, { signed: true })}

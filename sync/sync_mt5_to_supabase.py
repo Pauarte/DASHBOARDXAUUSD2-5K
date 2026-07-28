@@ -157,6 +157,27 @@ def sync_account_snapshot():
     ).execute()
 
 
+def record_floating_snapshot():
+    account = mt5.account_info()
+    if account is None:
+        return
+
+    positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
+    positions = [p for p in positions if p.magic == MAGIC_FILTER]
+    floating_pnl = sum(p.profit + p.swap for p in positions)
+
+    # Append-only history (never upserted) so we can find the worst floating
+    # P&L this account has ever been exposed to, and exactly when it happened.
+    supabase.table("floating_pnl_snapshots").insert(
+        {
+            "account": str(ACCOUNT_LOGIN),
+            "floating_pnl": floating_pnl,
+            "equity": account.equity,
+            "balance": account.balance,
+        }
+    ).execute()
+
+
 def main():
     connect()
     print(f"Connected to MT5 account {ACCOUNT_LOGIN}, syncing every {POLL_SECONDS}s.")
@@ -165,6 +186,7 @@ def main():
             sync_closed_trades()
             sync_open_positions()
             sync_account_snapshot()
+            record_floating_snapshot()
             print("Sync pass OK.")
         except Exception as exc:  # one bad pass must not kill the loop
             print(f"Sync pass failed: {exc}")

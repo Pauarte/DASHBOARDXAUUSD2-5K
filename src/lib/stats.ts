@@ -11,10 +11,11 @@ export interface DailyPnl {
   pnl: number
 }
 
-// A "trade" for stats purposes: every leg that closes at the exact same
-// timestamp is one basket (the bot has no per-leg stop loss — it adds
-// same-direction legs and closes them all together). The basket's total
-// P&L, not any single leg, decides win/loss.
+// A "trade" for stats purposes: every leg that closes within a few seconds
+// of the previous one is the same basket (the bot has no per-leg stop loss —
+// it adds same-direction legs and closes them all together, but each leg's
+// close order can land a second or two apart). The basket's total P&L, not
+// any single leg, decides win/loss.
 export interface Basket {
   closeTime: string
   legs: Trade[]
@@ -22,6 +23,8 @@ export interface Basket {
   isWin: boolean
   isLoss: boolean
 }
+
+const BASKET_CLOSE_GAP_SECONDS = 3
 
 export interface AccountStats {
   totalTrades: number
@@ -37,23 +40,29 @@ export interface AccountStats {
   maxDrawdownPct: number
   maxDrawdownMoney: number
   todayPnl: number
-  expectancy: number
 }
 
 export function groupIntoBaskets(trades: Trade[]): Basket[] {
-  const byCloseTime = new Map<string, Trade[]>()
-  for (const trade of trades) {
-    const legs = byCloseTime.get(trade.closeTime) ?? []
-    legs.push(trade)
-    byCloseTime.set(trade.closeTime, legs)
+  const sorted = [...trades].sort((a, b) => a.closeTime.localeCompare(b.closeTime))
+
+  const groups: Trade[][] = []
+  for (const trade of sorted) {
+    const current = groups[groups.length - 1]
+    const prevTime = current ? new Date(current[current.length - 1].closeTime).getTime() : null
+    const gapSeconds = prevTime !== null ? (new Date(trade.closeTime).getTime() - prevTime) / 1000 : Infinity
+
+    if (current && gapSeconds <= BASKET_CLOSE_GAP_SECONDS) {
+      current.push(trade)
+    } else {
+      groups.push([trade])
+    }
   }
 
-  return Array.from(byCloseTime.entries())
-    .map(([closeTime, legs]) => {
-      const pnl = Number(legs.reduce((s, t) => s + t.pnl, 0).toFixed(2))
-      return { closeTime, legs, pnl, isWin: pnl > 0, isLoss: pnl < 0 }
-    })
-    .sort((a, b) => a.closeTime.localeCompare(b.closeTime))
+  return groups.map((legs) => {
+    const pnl = Number(legs.reduce((s, t) => s + t.pnl, 0).toFixed(2))
+    const closeTime = legs[legs.length - 1].closeTime
+    return { closeTime, legs, pnl, isWin: pnl > 0, isLoss: pnl < 0 }
+  })
 }
 
 export function buildEquityCurve(trades: Trade[], startBalance: number): EquityPoint[] {
@@ -111,7 +120,6 @@ export function computeStats(trades: Trade[], startBalance: number): AccountStat
   const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0
   const avgWin = wins.length > 0 ? grossProfit / wins.length : 0
   const avgLoss = losses.length > 0 ? grossLoss / losses.length : 0
-  const expectancy = totalTrades > 0 ? totalPnl / totalTrades : 0
 
   return {
     totalTrades,
@@ -127,6 +135,5 @@ export function computeStats(trades: Trade[], startBalance: number): AccountStat
     maxDrawdownPct,
     maxDrawdownMoney,
     todayPnl: Number(todayPnl.toFixed(2)),
-    expectancy,
   }
 }

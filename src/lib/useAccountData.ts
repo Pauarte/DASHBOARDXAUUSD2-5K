@@ -5,12 +5,18 @@ import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from
 
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
 
+export interface WorstFloating {
+  value: number
+  at: string
+}
+
 interface AccountData {
   trades: Trade[]
   openPositions: OpenPosition[]
   account: AccountSnapshot
   isLive: boolean
   loading: boolean
+  worstFloating: WorstFloating | null
 }
 
 const FALLBACK: AccountData = {
@@ -19,6 +25,7 @@ const FALLBACK: AccountData = {
   account: mockAccount,
   isLive: false,
   loading: false,
+  worstFloating: null,
 }
 
 interface TradeRow {
@@ -60,7 +67,7 @@ export function useAccountData(): AccountData {
     let cancelled = false
 
     async function load() {
-      const [tradesRes, positionsRes, snapshotRes] = await Promise.all([
+      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes] = await Promise.all([
         supabase!
           .from('trades')
           .select('id, direction, lots, entry_price, exit_price, open_time, close_time, pnl, exit_reason')
@@ -71,6 +78,18 @@ export function useAccountData(): AccountData {
           .select('mt5_ticket, direction, lots, entry_price, current_price, open_time, floating_pnl')
           .eq('account', ACCOUNT_ID),
         supabase!.from('account_snapshots').select('balance, equity, currency').eq('account', ACCOUNT_ID).maybeSingle(),
+        // floating_pnl_snapshots may not exist yet on older deployments — tolerate the error.
+        supabase!
+          .from('floating_pnl_snapshots')
+          .select('floating_pnl, recorded_at')
+          .eq('account', ACCOUNT_ID)
+          .order('floating_pnl', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+          .then(
+            (res) => res,
+            () => ({ data: null, error: null }),
+          ),
       ])
 
       if (cancelled) return
@@ -117,6 +136,11 @@ export function useAccountData(): AccountData {
 
       const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
+      const worstRow = worstFloatingRes.data as { floating_pnl: string | number; recorded_at: string } | null
+      const worstFloating: WorstFloating | null = worstRow
+        ? { value: Number(worstRow.floating_pnl), at: worstRow.recorded_at }
+        : null
+
       setData({
         trades,
         openPositions,
@@ -129,6 +153,7 @@ export function useAccountData(): AccountData {
         },
         isLive: true,
         loading: false,
+        worstFloating,
       })
     }
 
