@@ -54,6 +54,28 @@ SELF_PATH = os.path.abspath(__file__)
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 
+def server_utc_offset_seconds() -> float:
+    """
+    MT5 deal/position 'time' fields are Unix epoch numbers computed from the
+    broker SERVER's clock, not true UTC — a well-known MT5 gotcha. Naively
+    converting them with tz=utc silently mislabels server-local time as UTC
+    (this account's server runs a few hours ahead of real UTC), which made
+    every timestamp in the dashboard wrong. Measure the live offset between
+    the server's current tick time and this machine's true UTC clock, and
+    round to the nearest hour since broker offsets are always whole hours.
+    """
+    tick = mt5.symbol_info_tick(SYMBOL_FILTER)
+    if tick is None or not tick.time:
+        return 0
+    raw_offset = tick.time - time.time()
+    return round(raw_offset / 3600) * 3600
+
+
+def to_utc_iso(epoch_seconds: float, offset_seconds: float) -> str:
+    true_epoch = epoch_seconds - offset_seconds
+    return datetime.datetime.fromtimestamp(true_epoch, tz=datetime.timezone.utc).isoformat()
+
+
 def connect():
     if not mt5.initialize(path=TERMINAL_PATH):
         raise RuntimeError(f"mt5.initialize failed: {mt5.last_error()}")
@@ -68,6 +90,7 @@ def connect():
 
 
 def sync_closed_trades():
+    offset = server_utc_offset_seconds()
     to_date = datetime.datetime.now()
     from_date = to_date - datetime.timedelta(days=HISTORY_LOOKBACK_DAYS)
 
@@ -118,12 +141,8 @@ def sync_closed_trades():
                 "lots": exit_volume,
                 "entry_price": entry_price,
                 "exit_price": exit_price,
-                "open_time": datetime.datetime.fromtimestamp(
-                    open_time, tz=datetime.timezone.utc
-                ).isoformat(),
-                "close_time": datetime.datetime.fromtimestamp(
-                    close_time, tz=datetime.timezone.utc
-                ).isoformat(),
+                "open_time": to_utc_iso(open_time, offset),
+                "close_time": to_utc_iso(close_time, offset),
                 "pnl": pnl,
                 # TODO: refine once we know this bot's actual exit logic (TP/MANUAL/TIME).
                 "exit_reason": "MANUAL",
@@ -136,6 +155,7 @@ def sync_closed_trades():
 
 
 def sync_open_positions():
+    offset = server_utc_offset_seconds()
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
     positions = [p for p in positions if p.magic == MAGIC_FILTER]
 
@@ -148,9 +168,7 @@ def sync_open_positions():
             "lots": p.volume,
             "entry_price": p.price_open,
             "current_price": p.price_current,
-            "open_time": datetime.datetime.fromtimestamp(
-                p.time, tz=datetime.timezone.utc
-            ).isoformat(),
+            "open_time": to_utc_iso(p.time, offset),
             "floating_pnl": p.profit + p.swap,
             "mt5_ticket": p.ticket,
         }
