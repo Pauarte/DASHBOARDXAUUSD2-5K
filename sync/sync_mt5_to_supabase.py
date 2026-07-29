@@ -31,6 +31,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 TERMINAL_PATH = os.environ["MT5_TERMINAL_PATH"]
 ACCOUNT_LOGIN = int(os.environ["MT5_ACCOUNT"])
+MAGIC_FILTER = int(os.environ["MT5_MAGIC_NUMBER"])
 
 SYMBOL_FILTER = "XAUUSD"
 POLL_SECONDS = 60
@@ -103,8 +104,12 @@ def sync_closed_trades():
     if deals is None:
         deals = ()
 
-    # The account is dedicated to this bot. Track every XAUUSD position because
-    # Bitget does not preserve the MT5 magic number reliably on every deal.
+    # Group by symbol only here — MT5/the broker can tag the closing deal
+    # with a different (or zero) magic number than the opening deal, so
+    # filtering every deal by MAGIC_FILTER can silently drop the exit leg
+    # and make a fully closed position never show up. Magic is checked
+    # below, on the entry deal only, since that identifies "this bot opened
+    # it" — without it, unrelated old/manual trades on the account leak in.
     by_position = defaultdict(list)
     for d in deals:
         if d.symbol != SYMBOL_FILTER:
@@ -121,6 +126,8 @@ def sync_closed_trades():
         ]
         if not entries or not exits:
             continue  # not a fully closed position
+        if entries[0].magic != MAGIC_FILTER:
+            continue  # not opened by this bot
         entry_volume = sum(d.volume for d in entries)
         exit_volume = sum(d.volume for d in exits)
         if entry_volume <= 0 or exit_volume <= 0:
@@ -162,6 +169,7 @@ def sync_closed_trades():
 def sync_open_positions(updated_at: str):
     offset = server_utc_offset_seconds()
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
+    positions = [p for p in positions if p.magic == MAGIC_FILTER]
 
     live_tickets = [p.ticket for p in positions]
     rows = [
@@ -205,6 +213,7 @@ def sync_account_snapshot(account, updated_at: str):
 
 def record_floating_snapshot(account):
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
+    positions = [p for p in positions if p.magic == MAGIC_FILTER]
     floating_pnl = sum(p.profit + p.swap for p in positions)
 
     # Append-only history (never upserted) so we can find the worst floating
