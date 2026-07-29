@@ -9,6 +9,13 @@ import {
   type PersonStake,
 } from '../lib/capitalPool'
 import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
+import {
+  checkPassword,
+  clearIdentity,
+  loadStoredIdentity,
+  storeIdentity,
+  type PartnerIdentity,
+} from '../lib/partnersAuth'
 
 interface ContributionDbRow {
   id: number
@@ -37,13 +44,73 @@ function mapRow(r: ContributionDbRow): ContributionRow {
 }
 
 export function PartnersPage() {
+  const [identity, setIdentity] = useState<PartnerIdentity | null>(() => loadStoredIdentity())
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState(false)
+
+  if (!identity) {
+    return (
+      <div className="min-h-screen bg-[var(--surface-2)] flex items-center justify-center px-6">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const found = checkPassword(password)
+            if (found) {
+              storeIdentity(found)
+              setIdentity(found)
+              setAuthError(false)
+            } else {
+              setAuthError(true)
+            }
+          }}
+          className="w-full max-w-xs rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-6 flex flex-col gap-3"
+        >
+          <h1 className="text-base font-semibold text-[var(--text-primary)]">Repartiment de capital</h1>
+          <p className="text-xs text-[var(--text-muted)]">Introdueix la teva contrasenya per entrar.</p>
+          <input
+            type="password"
+            autoFocus
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setAuthError(false)
+            }}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+          />
+          {authError && <p className="text-xs text-[var(--critical)]">Contrasenya incorrecta.</p>}
+          <button
+            type="submit"
+            className="rounded-lg bg-[var(--series-blue)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Entrar
+          </button>
+          <a href="/" className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-center">
+            ← Tornar al dashboard
+          </a>
+        </form>
+      </div>
+    )
+  }
+
+  return (
+    <PartnersDashboard
+      identity={identity}
+      onLogout={() => {
+        clearIdentity()
+        setIdentity(null)
+      }}
+    />
+  )
+}
+
+function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
   const { account, isLive } = useAccountData()
 
   const [rows, setRows] = useState<ContributionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [personName, setPersonName] = useState('')
+  const [personName, setPersonName] = useState(identity.isAdmin ? '' : identity.personName)
   const [type, setType] = useState<ContributionType>('deposit')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
@@ -73,9 +140,11 @@ export function PartnersPage() {
 
   const totalUnits = rows.reduce((s, r) => s + r.unitsDelta, 0)
   const poolValue = isLive ? account.balance : 0
-  const stakes = useMemo(() => computeStakes(rows, poolValue), [rows, poolValue])
+  const allStakes = useMemo(() => computeStakes(rows, poolValue), [rows, poolValue])
+  const stakes = identity.isAdmin ? allStakes : allStakes.filter((s) => s.personName === identity.personName)
   const knownNames = useMemo(() => Array.from(new Set(rows.map((r) => r.personName))), [rows])
-  const history = useMemo(() => [...rows].reverse(), [rows])
+  const allHistory = useMemo(() => [...rows].reverse(), [rows])
+  const history = identity.isAdmin ? allHistory : allHistory.filter((r) => r.personName === identity.personName)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -145,15 +214,27 @@ export function PartnersPage() {
           <div>
             <h1 className="text-lg font-semibold">Repartiment de capital</h1>
             <p className="text-xs text-[var(--text-muted)]">
+              Connectat com a <span className="font-semibold">{identity.personName}</span>
+              {identity.isAdmin ? ' (veus tothom)' : ''}
+              {' · '}
               {isLive ? `Pot actual: ${formatCurrency(poolValue)}` : 'Esperant dades del compte…'}
             </p>
           </div>
-          <a
-            href="/"
-            className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] whitespace-nowrap"
-          >
-            ← Dashboard
-          </a>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] whitespace-nowrap"
+            >
+              Sortir
+            </button>
+            <a
+              href="/"
+              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] whitespace-nowrap"
+            >
+              ← Dashboard
+            </a>
+          </div>
         </div>
       </header>
 
@@ -215,17 +296,19 @@ export function PartnersPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="border-t border-[var(--border)] font-semibold">
-                    <td className="py-2 pr-3 text-[var(--text-primary)]">Total</td>
-                    <td className="py-2 pr-3 text-right tabular">
-                      {formatCurrency(stakes.reduce((s, p) => s + p.netContributed, 0), { signed: true })}
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular">100%</td>
-                    <td className="py-2 pr-3 text-right tabular">{formatCurrency(poolValue)}</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
+                {identity.isAdmin && (
+                  <tfoot>
+                    <tr className="border-t border-[var(--border)] font-semibold">
+                      <td className="py-2 pr-3 text-[var(--text-primary)]">Total</td>
+                      <td className="py-2 pr-3 text-right tabular">
+                        {formatCurrency(stakes.reduce((s, p) => s + p.netContributed, 0), { signed: true })}
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular">100%</td>
+                      <td className="py-2 pr-3 text-right tabular">{formatCurrency(poolValue)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}
@@ -242,7 +325,8 @@ export function PartnersPage() {
                   value={personName}
                   onChange={(e) => setPersonName(e.target.value)}
                   placeholder="Nom"
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                  disabled={!identity.isAdmin}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm disabled:opacity-70"
                   required
                 />
                 <datalist id="known-names">
