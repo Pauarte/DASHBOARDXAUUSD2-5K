@@ -75,7 +75,15 @@ function App() {
       <header className="border-b border-[var(--border)] bg-[var(--surface-card)]">
         <div className="max-w-6xl mx-auto px-6 py-5 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold">Monitor Bots Trading</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold">Monitor Bots Trading</h1>
+              <a
+                href="/socis"
+                className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]"
+              >
+                Repartiment de capital
+              </a>
+            </div>
             <p className="text-xs text-[var(--text-muted)]">
               {loading
                 ? 'Carregant…'

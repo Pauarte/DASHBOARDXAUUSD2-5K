@@ -141,12 +141,19 @@ export function PartnersPage() {
   return (
     <div className="min-h-screen bg-[var(--surface-2)]">
       <header className="border-b border-[var(--border)] bg-[var(--surface-card)]">
-        <div className="max-w-4xl mx-auto px-6 py-5">
-          <h1 className="text-lg font-semibold">Repartiment de capital</h1>
-          <p className="text-xs text-[var(--text-muted)]">
-            Pàgina privada — no enllaçada des del dashboard públic.{' '}
-            {isLive ? `Pot actual: ${formatCurrency(poolValue)}` : 'Esperant dades del compte…'}
-          </p>
+        <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-semibold">Repartiment de capital</h1>
+            <p className="text-xs text-[var(--text-muted)]">
+              {isLive ? `Pot actual: ${formatCurrency(poolValue)}` : 'Esperant dades del compte…'}
+            </p>
+          </div>
+          <a
+            href="/"
+            className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)] whitespace-nowrap"
+          >
+            ← Dashboard
+          </a>
         </div>
       </header>
 
