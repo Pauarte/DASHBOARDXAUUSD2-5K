@@ -45,6 +45,18 @@ if ([string]::IsNullOrWhiteSpace($content) -or $content -notmatch "def main\(") 
     throw "La descarrega no sembla un script valid -- no es toca res. Torna-ho a provar mes tard."
 }
 
+# Comprovacio real de sintaxi Python (py_compile). Aixo detecta qualsevol
+# corrupcio del fitxer (per exemple, si s'ha enganxat codi a traves d'un
+# xat que ha convertit "__file__" en "**file**" en negreta) ABANS de
+# substituir l'script que ja funciona -- si falla, no es toca res.
+python -m py_compile $tmpPath
+if ($LASTEXITCODE -ne 0) {
+    Remove-Item $tmpPath -ErrorAction SilentlyContinue
+    Remove-Item "$tmpPath.pyc" -ErrorAction SilentlyContinue
+    throw "El fitxer descarregat NO compila (sintaxi invalida) -- no es toca res. Avisa abans de reintentar."
+}
+Remove-Item (Join-Path (Split-Path $tmpPath) "__pycache__") -Recurse -Force -ErrorAction SilentlyContinue
+
 Write-Host "Descarregant requirements.txt..."
 Invoke-WebRequest -Uri "$repoRaw/requirements.txt" -OutFile (Join-Path $dir "requirements.txt")
 
