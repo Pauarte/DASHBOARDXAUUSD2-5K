@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { useAccountData } from '../lib/useAccountData'
 import {
   computeStakes,
+  personValueOverTime,
   unitsForAmount,
   type ContributionRow,
   type ContributionType,
@@ -16,6 +17,8 @@ import {
   storeIdentity,
   type PartnerIdentity,
 } from '../lib/partnersAuth'
+import { StatTile } from '../components/StatTile'
+import { PersonalValueChart } from '../components/PersonalValueChart'
 
 interface ContributionDbRow {
   id: number
@@ -107,6 +110,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   const { account, isLive } = useAccountData()
 
   const [rows, setRows] = useState<ContributionRow[]>([])
+  const [balanceHistory, setBalanceHistory] = useState<{ recordedAt: string; balance: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -119,16 +123,31 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   async function load() {
     if (!supabase) return
     setLoading(true)
-    const { data, error: fetchError } = await supabase
-      .from('capital_contributions')
-      .select('id, person_name, type, amount, pool_value_before, units_before, units_delta, note, created_at')
-      .order('created_at', { ascending: true })
+    const [contributionsRes, balanceRes] = await Promise.all([
+      supabase
+        .from('capital_contributions')
+        .select('id, person_name, type, amount, pool_value_before, units_before, units_delta, note, created_at')
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('floating_pnl_snapshots')
+        .select('recorded_at, balance')
+        .order('recorded_at', { ascending: true })
+        .limit(5000),
+    ])
 
-    if (fetchError) {
-      setError(fetchError.message)
+    if (contributionsRes.error) {
+      setError(contributionsRes.error.message)
     } else {
-      setRows(((data as ContributionDbRow[] | null) ?? []).map(mapRow))
+      setRows(((contributionsRes.data as ContributionDbRow[] | null) ?? []).map(mapRow))
       setError(null)
+    }
+    if (!balanceRes.error) {
+      setBalanceHistory(
+        ((balanceRes.data as Array<{ recorded_at: string; balance: string | number }> | null) ?? []).map((r) => ({
+          recordedAt: r.recorded_at,
+          balance: Number(r.balance),
+        })),
+      )
     }
     setLoading(false)
   }
@@ -145,6 +164,13 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   const knownNames = useMemo(() => Array.from(new Set(rows.map((r) => r.personName))), [rows])
   const allHistory = useMemo(() => [...rows].reverse(), [rows])
   const history = identity.isAdmin ? allHistory : allHistory.filter((r) => r.personName === identity.personName)
+
+  const myStake = allStakes.find((s) => s.personName === identity.personName) ?? null
+  const myValueHistory = useMemo(
+    () => personValueOverTime(rows, identity.personName, balanceHistory),
+    [rows, identity.personName, balanceHistory],
+  )
+  const myGainLoss = myStake ? myStake.currentValue - myStake.netContributed : 0
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -250,6 +276,24 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
           </div>
         )}
 
+        <section className="flex flex-col gap-4">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">El teu dashboard</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatTile label="El teu valor" value={myStake ? formatCurrency(myStake.currentValue) : '—'} />
+            <StatTile label="El teu %" value={myStake ? formatPercent(myStake.percentage, 1) : '—'} />
+            <StatTile
+              label="Aportat net"
+              value={myStake ? formatCurrency(myStake.netContributed, { signed: true }) : '—'}
+            />
+            <StatTile
+              label="Guany / pèrdua"
+              value={myStake ? formatCurrency(myGainLoss, { signed: true }) : '—'}
+              tone={myGainLoss >= 0 ? 'good' : 'critical'}
+            />
+          </div>
+          <PersonalValueChart data={myValueHistory} />
+        </section>
+
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
           <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Participacions actuals</h2>
           {loading ? (
@@ -282,7 +326,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
                         {formatCurrency(p.currentValue)}
                       </td>
                       <td className="py-2 text-right">
-                        {p.units > 0 && (
+                        {identity.isAdmin && p.units > 0 && (
                           <button
                             type="button"
                             disabled={submitting}
@@ -314,6 +358,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
           )}
         </section>
 
+        {identity.isAdmin && (
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
           <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Afegir moviment</h2>
           <form onSubmit={submit} className="flex flex-col gap-3">
@@ -383,6 +428,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             )}
           </form>
         </section>
+        )}
 
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
           <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Historial de moviments</h2>
@@ -398,7 +444,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
                     <th className="font-medium py-2 pr-3">Tipus</th>
                     <th className="font-medium py-2 pr-3 text-right">Import</th>
                     <th className="font-medium py-2 pr-3 text-right">Pot en aquell moment</th>
-                    <th className="font-medium py-2"></th>
+                    {identity.isAdmin && <th className="font-medium py-2"></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -425,16 +471,18 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
                       <td className="py-2 pr-3 text-right tabular text-[var(--text-secondary)]">
                         {formatCurrency(r.poolValueBefore)}
                       </td>
-                      <td className="py-2 text-right">
-                        <button
-                          type="button"
-                          disabled={submitting}
-                          onClick={() => removeMovement(r.id)}
-                          className="text-[10px] text-[var(--text-muted)] hover:text-[var(--critical)] disabled:opacity-50"
-                        >
-                          Eliminar
-                        </button>
-                      </td>
+                      {identity.isAdmin && (
+                        <td className="py-2 text-right">
+                          <button
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => removeMovement(r.id)}
+                            className="text-[10px] text-[var(--text-muted)] hover:text-[var(--critical)] disabled:opacity-50"
+                          >
+                            Eliminar
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -35,6 +35,40 @@ export function unitsForAmount(amount: number, poolValueBefore: number, unitsBef
   return amount / navPerUnit(poolValueBefore, unitsBefore)
 }
 
+export interface PersonValuePoint {
+  time: string
+  value: number
+}
+
+// Reconstructs one person's $ value over time from the account's balance
+// history plus the contribution ledger — at each balance snapshot, the
+// person's value is (their units at that point / total units at that
+// point) * balance. Both inputs must already be sorted ascending by time.
+export function personValueOverTime(
+  rows: ContributionRow[],
+  personName: string,
+  balanceHistory: { recordedAt: string; balance: number }[],
+): PersonValuePoint[] {
+  const points: PersonValuePoint[] = []
+  let rowIndex = 0
+  let totalUnits = 0
+  let personUnits = 0
+
+  for (const snapshot of balanceHistory) {
+    while (rowIndex < rows.length && rows[rowIndex].createdAt <= snapshot.recordedAt) {
+      const row = rows[rowIndex]
+      totalUnits += row.unitsDelta
+      if (row.personName === personName) personUnits += row.unitsDelta
+      rowIndex += 1
+    }
+    if (totalUnits > 0) {
+      points.push({ time: snapshot.recordedAt, value: (personUnits / totalUnits) * snapshot.balance })
+    }
+  }
+
+  return points
+}
+
 export function computeStakes(rows: ContributionRow[], currentPoolValue: number): PersonStake[] {
   const totalUnits = rows.reduce((s, r) => s + r.unitsDelta, 0)
 
