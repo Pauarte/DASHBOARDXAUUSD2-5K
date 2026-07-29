@@ -66,9 +66,13 @@ function App() {
   const accountTotalPnl = account.balance - totalNetCapital
   const historyGap = Number((accountTotalPnl - stats.totalPnl).toFixed(2))
   const hasHistoryGap = isLive && Math.abs(historyGap) >= 0.01
+  // Bridge to a "current" point using the capital-adjusted balance (genesis
+  // + real trading P&L), not the raw account balance — otherwise a partner
+  // deposit/withdrawal shows up as a fake jump on the profit curve.
+  const capitalAdjustedBalance = account.startBalance + accountTotalPnl
   const equityCurve = useMemo(
-    () => buildEquityCurve(trades, account.startBalance, account.balance, lastSyncAt),
-    [trades, account.startBalance, account.balance, lastSyncAt],
+    () => buildEquityCurve(trades, account.startBalance, capitalAdjustedBalance, lastSyncAt),
+    [trades, account.startBalance, capitalAdjustedBalance, lastSyncAt],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
 

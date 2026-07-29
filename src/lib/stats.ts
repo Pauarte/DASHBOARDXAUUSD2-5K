@@ -4,6 +4,7 @@ import { dashboardDateKey } from './format'
 export interface EquityPoint {
   time: string
   balance: number
+  profit: number
   drawdownPct: number
 }
 
@@ -98,15 +99,23 @@ export function buildEquityCurve(
 ): EquityPoint[] {
   let peak = startBalance
   const points: EquityPoint[] = [
-    { time: trades[0]?.openTime ?? new Date().toISOString(), balance: startBalance, drawdownPct: 0 },
+    { time: trades[0]?.openTime ?? new Date().toISOString(), balance: startBalance, profit: 0, drawdownPct: 0 },
   ]
 
   for (const trade of trades) {
     peak = Math.max(peak, trade.balanceAfter)
     const drawdownPct = peak > 0 ? ((trade.balanceAfter - peak) / peak) * 100 : 0
-    points.push({ time: trade.closeTime, balance: trade.balanceAfter, drawdownPct })
+    points.push({
+      time: trade.closeTime,
+      balance: trade.balanceAfter,
+      profit: trade.balanceAfter - startBalance,
+      drawdownPct,
+    })
   }
 
+  // currentBalance should already be capital-adjusted (genesis + real
+  // trading P&L) by the caller, not the account's raw balance — otherwise
+  // a partner deposit/withdrawal would show up here as a fake profit jump.
   if (currentBalance !== undefined) {
     const lastPoint = points[points.length - 1]
     if (Math.abs(lastPoint.balance - currentBalance) >= 0.01) {
@@ -115,6 +124,7 @@ export function buildEquityCurve(
       points.push({
         time: currentTime ?? new Date().toISOString(),
         balance: currentBalance,
+        profit: currentBalance - startBalance,
         drawdownPct,
       })
     }

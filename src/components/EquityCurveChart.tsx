@@ -9,8 +9,8 @@ export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Equity curve</h3>
-        <span className="text-xs text-[var(--text-muted)]">Balance after each closed trade</span>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Corba de guanys</h3>
+        <span className="text-xs text-[var(--text-muted)]">Benefici net acumulat (sense capital aportat)</span>
       </div>
       <ResponsiveContainer width="100%" height={260}>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -28,7 +28,7 @@ export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
             minTickGap={40}
           />
           <YAxis
-            domain={['dataMin - 40', 'dataMax + 40']}
+            domain={['dataMin - 20', 'dataMax + 20']}
             tickFormatter={(v) => `$${Math.round(v).toLocaleString()}`}
             tick={{ fill: colors.textMuted, fontSize: 11 }}
             stroke={colors.baseline}
@@ -43,7 +43,11 @@ export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
                 <ChartTooltip
                   title={formatDateTime(label as string)}
                   rows={[
-                    { label: 'Balance', value: formatCurrency(point.balance), color: colors.seriesBlue },
+                    {
+                      label: 'Guany',
+                      value: formatCurrency(point.profit, { signed: true }),
+                      color: colors.seriesBlue,
+                    },
                   ]}
                 />
               )
@@ -52,7 +56,7 @@ export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
           <Area
             isAnimationActive={false}
             type="monotone"
-            dataKey="balance"
+            dataKey="profit"
             stroke={colors.seriesBlue}
             strokeWidth={2}
             fill="url(#equityFill)"
