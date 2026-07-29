@@ -175,7 +175,7 @@ function App() {
             tone={stats.todayPnl >= 0 ? 'good' : 'critical'}
           />
           <StatTile
-            label="Cistelles tancades"
+            label="Operacions tancades"
             value={stats.totalTrades.toString()}
             sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakEvens}BE`}
           />

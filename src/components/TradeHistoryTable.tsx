@@ -30,7 +30,7 @@ export function TradeHistoryTable({
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Cistelles recents</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Operacions recents</h3>
         <span className="text-xs text-[var(--text-muted)]">
           Últimes {baskets.length} tancades
         </span>
