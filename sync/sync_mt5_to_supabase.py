@@ -15,9 +15,7 @@ Setup on the VPS:
 
 import datetime
 import os
-import sys
 import time
-import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
@@ -25,10 +23,8 @@ import MetaTrader5 as mt5
 from dotenv import load_dotenv
 from supabase import create_client
 
-# Load .env from this script's own folder, not the process's current
-# working directory — the Scheduled Task (and the self-restart via
-# os.execv below) may launch this from a different CWD, which made plain
-# load_dotenv() silently find nothing and crash with KeyError.
+# Load .env from this script's own folder because Scheduled Tasks may use a
+# different working directory.
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -41,17 +37,15 @@ SYMBOL_FILTER = "XAUUSD"
 POLL_SECONDS = 60
 HISTORY_LOOKBACK_DAYS = 30
 
-# Self-update: check GitHub for a newer version of this file every N passes,
-# and if it changed, overwrite this file on disk and restart the process —
-# so pushing a fix means the VPS picks it up on its own within a few
-# minutes, no manual copy/paste or double-click needed.
-SELF_UPDATE_URL = (
-    "https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/sync_mt5_to_supabase.py"
-)
-SELF_UPDATE_EVERY_N_PASSES = 5
-SELF_PATH = os.path.abspath(__file__)
-
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+
+def utc_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def log(message: str) -> None:
+    print(f"[{utc_now().isoformat(timespec='seconds')}] {message}", flush=True)
 
 
 def server_utc_offset_seconds() -> float:
@@ -77,11 +71,23 @@ def to_utc_iso(epoch_seconds: float, offset_seconds: float) -> str:
 
 
 def connect():
+    mt5.shutdown()
     if not mt5.initialize(path=TERMINAL_PATH):
         raise RuntimeError(f"mt5.initialize failed: {mt5.last_error()}")
     account = mt5.account_info()
     if account is None:
         raise RuntimeError(f"account_info failed: {mt5.last_error()}")
+    if account.login != ACCOUNT_LOGIN:
+        raise RuntimeError(
+            f"Wrong MT5 account: expected {ACCOUNT_LOGIN}, terminal has {account.login}"
+        )
+    return account
+
+
+def ensure_connected():
+    account = mt5.account_info()
+    if account is None:
+        return connect()
     if account.login != ACCOUNT_LOGIN:
         raise RuntimeError(
             f"Wrong MT5 account: expected {ACCOUNT_LOGIN}, terminal has {account.login}"
@@ -154,7 +160,7 @@ def sync_closed_trades():
         supabase.table("trades").upsert(rows, on_conflict="account,mt5_deal_id").execute()
 
 
-def sync_open_positions():
+def sync_open_positions(updated_at: str):
     offset = server_utc_offset_seconds()
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
     positions = [p for p in positions if p.magic == MAGIC_FILTER]
@@ -171,6 +177,7 @@ def sync_open_positions():
             "open_time": to_utc_iso(p.time, offset),
             "floating_pnl": p.profit + p.swap,
             "mt5_ticket": p.ticket,
+            "updated_at": updated_at,
         }
         for p in positions
     ]
@@ -184,26 +191,20 @@ def sync_open_positions():
         supabase.table("open_positions").upsert(rows, on_conflict="account,mt5_ticket").execute()
 
 
-def sync_account_snapshot():
-    account = mt5.account_info()
-    if account is None:
-        return
+def sync_account_snapshot(account, updated_at: str):
     supabase.table("account_snapshots").upsert(
         {
             "account": str(ACCOUNT_LOGIN),
             "balance": account.balance,
             "equity": account.equity,
             "currency": account.currency,
+            "updated_at": updated_at,
         },
         on_conflict="account",
     ).execute()
 
 
-def record_floating_snapshot():
-    account = mt5.account_info()
-    if account is None:
-        return
-
+def record_floating_snapshot(account):
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
     positions = [p for p in positions if p.magic == MAGIC_FILTER]
     floating_pnl = sum(p.profit + p.swap for p in positions)
@@ -220,43 +221,26 @@ def record_floating_snapshot():
     ).execute()
 
 
-def check_for_update():
-    try:
-        with urllib.request.urlopen(SELF_UPDATE_URL, timeout=10) as resp:
-            remote_code = resp.read()
-    except Exception as exc:
-        print(f"Update check failed (ignoring): {exc}")
-        return
-
-    with open(SELF_PATH, "rb") as f:
-        local_code = f.read()
-
-    if remote_code and remote_code != local_code:
-        print("New version available — updating and restarting…")
-        with open(SELF_PATH, "wb") as f:
-            f.write(remote_code)
-        os.execv(sys.executable, [sys.executable, SELF_PATH])
-
-
 def main():
-    connect()
-    print(f"Connected to MT5 account {ACCOUNT_LOGIN}, syncing every {POLL_SECONDS}s.")
-    pass_count = 0
+    log(f"Starting MT5 sync for account {ACCOUNT_LOGIN}; interval={POLL_SECONDS}s.")
     while True:
+        pass_started = time.monotonic()
         try:
+            account = ensure_connected()
+            updated_at = utc_now().isoformat()
             sync_closed_trades()
-            sync_open_positions()
-            sync_account_snapshot()
-            record_floating_snapshot()
-            print("Sync pass OK.")
+            sync_open_positions(updated_at)
+            sync_account_snapshot(account, updated_at)
+            record_floating_snapshot(account)
+            log(
+                "Sync pass OK. "
+                f"balance={account.balance:.2f} equity={account.equity:.2f}"
+            )
         except Exception as exc:  # one bad pass must not kill the loop
-            print(f"Sync pass failed: {exc}")
+            log(f"Sync pass failed: {exc!r}")
 
-        pass_count += 1
-        if pass_count % SELF_UPDATE_EVERY_N_PASSES == 0:
-            check_for_update()
-
-        time.sleep(POLL_SECONDS)
+        elapsed = time.monotonic() - pass_started
+        time.sleep(max(1, POLL_SECONDS - elapsed))
 
 
 if __name__ == "__main__":
