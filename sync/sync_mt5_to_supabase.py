@@ -31,7 +31,6 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 TERMINAL_PATH = os.environ["MT5_TERMINAL_PATH"]
 ACCOUNT_LOGIN = int(os.environ["MT5_ACCOUNT"])
-MAGIC_FILTER = int(os.environ["MT5_MAGIC_NUMBER"])
 
 SYMBOL_FILTER = "XAUUSD"
 POLL_SECONDS = 60
@@ -104,11 +103,8 @@ def sync_closed_trades():
     if deals is None:
         deals = ()
 
-    # Group by symbol only here — MT5 sometimes tags the closing deal with a
-    # different (or zero) magic number than the opening deal, so filtering
-    # every deal by MAGIC_FILTER can silently drop the exit leg and make a
-    # fully closed position never show up. Magic is checked below, on the
-    # entry deal only, since that's what identifies "this bot opened it".
+    # The account is dedicated to this bot. Track every XAUUSD position because
+    # Bitget does not preserve the MT5 magic number reliably on every deal.
     by_position = defaultdict(list)
     for d in deals:
         if d.symbol != SYMBOL_FILTER:
@@ -125,19 +121,21 @@ def sync_closed_trades():
         ]
         if not entries or not exits:
             continue  # not a fully closed position
-        if entries[0].magic != MAGIC_FILTER:
-            continue  # not opened by this bot
-
         entry_volume = sum(d.volume for d in entries)
         exit_volume = sum(d.volume for d in exits)
+        if entry_volume <= 0 or exit_volume <= 0:
+            continue
         entry_price = sum(d.price * d.volume for d in entries) / entry_volume
         exit_price = sum(d.price * d.volume for d in exits) / exit_volume
 
         open_time = min(d.time for d in entries)
         close_time = max(d.time for d in exits)
-        pnl = sum(d.profit + d.commission + d.swap for d in position_deals)
+        pnl = sum(
+            d.profit + d.commission + d.swap + getattr(d, "fee", 0.0)
+            for d in position_deals
+        )
         direction = "BUY" if entries[0].type == mt5.DEAL_TYPE_BUY else "SELL"
-        exit_deal_id = max(exits, key=lambda d: d.time).ticket
+        exit_deal_id = max(exits, key=lambda d: (d.time, d.ticket)).ticket
 
         rows.append(
             {
@@ -158,12 +156,12 @@ def sync_closed_trades():
 
     if rows:
         supabase.table("trades").upsert(rows, on_conflict="account,mt5_deal_id").execute()
+    return len(rows)
 
 
 def sync_open_positions(updated_at: str):
     offset = server_utc_offset_seconds()
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
-    positions = [p for p in positions if p.magic == MAGIC_FILTER]
 
     live_tickets = [p.ticket for p in positions]
     rows = [
@@ -189,6 +187,7 @@ def sync_open_positions(updated_at: str):
 
     if rows:
         supabase.table("open_positions").upsert(rows, on_conflict="account,mt5_ticket").execute()
+    return len(rows)
 
 
 def sync_account_snapshot(account, updated_at: str):
@@ -206,7 +205,6 @@ def sync_account_snapshot(account, updated_at: str):
 
 def record_floating_snapshot(account):
     positions = mt5.positions_get(symbol=SYMBOL_FILTER) or ()
-    positions = [p for p in positions if p.magic == MAGIC_FILTER]
     floating_pnl = sum(p.profit + p.swap for p in positions)
 
     # Append-only history (never upserted) so we can find the worst floating
@@ -219,6 +217,7 @@ def record_floating_snapshot(account):
             "balance": account.balance,
         }
     ).execute()
+    return floating_pnl
 
 
 def main():
@@ -228,13 +227,15 @@ def main():
         try:
             account = ensure_connected()
             updated_at = utc_now().isoformat()
-            sync_closed_trades()
-            sync_open_positions(updated_at)
+            closed_positions = sync_closed_trades()
+            open_positions = sync_open_positions(updated_at)
             sync_account_snapshot(account, updated_at)
-            record_floating_snapshot(account)
+            floating_pnl = record_floating_snapshot(account)
             log(
                 "Sync pass OK. "
-                f"balance={account.balance:.2f} equity={account.equity:.2f}"
+                f"balance={account.balance:.2f} equity={account.equity:.2f} "
+                f"closed={closed_positions} open={open_positions} "
+                f"floating={floating_pnl:.2f}"
             )
         except Exception as exc:  # one bad pass must not kill the loop
             log(f"Sync pass failed: {exc!r}")

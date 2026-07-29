@@ -58,13 +58,13 @@ function App() {
   }, [hasConnectionAlert])
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
-  const floatingPnl = useMemo(
-    () => openPositions.reduce((sum, p) => sum + p.floatingPnl, 0),
-    [openPositions],
-  )
+  const floatingPnl = account.equity - account.balance
+  const accountTotalPnl = account.balance - account.startBalance
+  const historyGap = Number((accountTotalPnl - stats.totalPnl).toFixed(2))
+  const hasHistoryGap = isLive && Math.abs(historyGap) >= 0.01
   const equityCurve = useMemo(
-    () => buildEquityCurve(trades, account.startBalance),
-    [trades, account.startBalance],
+    () => buildEquityCurve(trades, account.startBalance, account.balance, lastSyncAt),
+    [trades, account.startBalance, account.balance, lastSyncAt],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
 
@@ -113,6 +113,15 @@ function App() {
           Fa més de 3 minuts que no arriben dades noves. Els valors poden estar desactualitzats.
         </div>
       )}
+      {hasHistoryGap && (
+        <div
+          className="border-b border-amber-700/40 bg-amber-950/30 px-6 py-3 text-center text-sm text-amber-100"
+          role="status"
+        >
+          L’historial d’operacions no quadra amb el balance real. Diferència pendent de
+          sincronitzar: {formatCurrency(historyGap, { signed: true })}.
+        </div>
+      )}
       {installPrompt && <button onClick={installApp} className="fixed bottom-4 right-4 z-10 rounded-full border border-[var(--border)] bg-[var(--surface-card)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] shadow-lg hover:text-[var(--text-primary)]">Instal·lar app</button>}
 
       <main className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
@@ -135,45 +144,50 @@ function App() {
           <StatTile
             label="Floating P&L"
             value={formatCurrency(floatingPnl, { signed: true })}
-            sub={`${openPositions.length} open`}
+            sub={`${openPositions.length} posicions obertes`}
             tone={floatingPnl >= 0 ? 'good' : 'critical'}
           />
           <StatTile
-            label="Worst floating ever"
+            label="Pitjor floating registrat"
             value={worstFloating ? formatCurrency(worstFloating.value, { signed: true }) : '—'}
-            sub={worstFloating ? formatDateTime(worstFloating.at) : 'Tracking starts now'}
+            sub={worstFloating ? formatDateTime(worstFloating.at) : 'Encara sense dades'}
             tone="critical"
           />
           <StatTile
-            label="Today's P&L"
+            label="P&L d’avui"
             value={formatCurrency(stats.todayPnl, { signed: true })}
             tone={stats.todayPnl >= 0 ? 'good' : 'critical'}
           />
           <StatTile
-            label="Total trades"
+            label="Cistelles tancades"
             value={stats.totalTrades.toString()}
             sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakEvens}BE`}
           />
           <StatTile label="Win rate" value={formatPercent(stats.winRate)} />
           <StatTile
-            label="Avg daily %"
+            label="Mitjana diària"
             value={formatPercent(stats.avgDailyReturnPct, 2)}
             tone={stats.avgDailyReturnPct >= 0 ? 'good' : 'critical'}
           />
           <StatTile
-            label="Best / worst trade"
+            label="Millor / pitjor cistella"
             value={formatCurrency(stats.bestTrade, { signed: true })}
             sub={formatCurrency(stats.worstTrade, { signed: true })}
           />
           <StatTile
-            label="Avg win / loss"
+            label="Mitjana guany / pèrdua"
             value={formatCurrency(stats.avgWin, { signed: true })}
             sub={formatCurrency(-stats.avgLoss, { signed: true })}
           />
           <StatTile
-            label="Total P&L"
-            value={formatCurrency(stats.totalPnl, { signed: true })}
-            tone={stats.totalPnl >= 0 ? 'good' : 'critical'}
+            label="P&L total real"
+            value={formatCurrency(accountTotalPnl, { signed: true })}
+            sub={
+              hasHistoryGap
+                ? `${formatCurrency(stats.totalPnl, { signed: true })} identificat`
+                : 'Quadra amb l’historial'
+            }
+            tone={accountTotalPnl >= 0 ? 'good' : 'critical'}
           />
         </section>
 

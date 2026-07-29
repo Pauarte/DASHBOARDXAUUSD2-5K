@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Trade } from '../lib/types'
 import { groupIntoBaskets } from '../lib/stats'
-import { formatCurrency } from '../lib/format'
+import { dashboardDateKey, formatCurrency } from '../lib/format'
 import { useThemeColors } from '../lib/useThemeColors'
 
 interface DayCell {
@@ -30,7 +30,7 @@ export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
   const byDay = useMemo(() => {
     const map = new Map<string, { pnl: number; trades: number }>()
     for (const basket of groupIntoBaskets(trades)) {
-      const day = basket.closeTime.slice(0, 10)
+      const day = dashboardDateKey(basket.closeTime)
       const entry = map.get(day) ?? { pnl: 0, trades: 0 }
       entry.pnl = Number((entry.pnl + basket.pnl).toFixed(2))
       entry.trades += 1
@@ -79,7 +79,7 @@ export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
   }, [year, month, byDay])
 
   const maxAbsPnl = Math.max(1, ...Array.from(byDay.values()).map((v) => Math.abs(v.pnl)))
-  const monthLabel = cursor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const monthLabel = cursor.toLocaleDateString('ca-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
   const [selected, setSelected] = useState<DayCell | null>(null)
   const detail = selected ?? (lastTradedDay ? { date: lastTradedDay, ...byDay.get(lastTradedDay)! } : null)
@@ -168,7 +168,7 @@ export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
         {detail ? (
           <>
             <span className="text-[var(--text-secondary)]">
-              {new Date(`${detail.date}T00:00:00Z`).toLocaleDateString('en-GB', {
+              {new Date(`${detail.date}T00:00:00Z`).toLocaleDateString('ca-ES', {
                 weekday: 'short',
                 day: '2-digit',
                 month: 'short',

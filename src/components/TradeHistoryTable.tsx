@@ -30,20 +30,22 @@ export function TradeHistoryTable({
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent trades</h3>
-        <span className="text-xs text-[var(--text-muted)]">Last {baskets.length} closed</span>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Cistelles recents</h3>
+        <span className="text-xs text-[var(--text-muted)]">
+          Últimes {baskets.length} tancades
+        </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
               <th className="font-medium py-2 pr-3 w-4"></th>
-              <th className="font-medium py-2 pr-3">Closed</th>
-              <th className="font-medium py-2 pr-3">Side</th>
-              <th className="font-medium py-2 pr-3">Cistelles</th>
+              <th className="font-medium py-2 pr-3">Tancament</th>
+              <th className="font-medium py-2 pr-3">Direcció</th>
+              <th className="font-medium py-2 pr-3">Entrades</th>
               <th className="font-medium py-2 pr-3">Lots</th>
-              <th className="font-medium py-2 pr-3">Avg entry</th>
-              <th className="font-medium py-2 pr-3 text-right">Worst floating</th>
+              <th className="font-medium py-2 pr-3">Entrada mitjana</th>
+              <th className="font-medium py-2 pr-3 text-right">Pitjor floating registrat</th>
               <th className="font-medium py-2 text-right">P&amp;L</th>
             </tr>
           </thead>
@@ -115,12 +117,12 @@ export function TradeHistoryTable({
                         <table className="w-full text-[11px]">
                           <thead>
                             <tr className="text-left text-[var(--text-muted)]">
-                              <th className="font-medium py-1 pr-3">Cistella</th>
-                              <th className="font-medium py-1 pr-3">Opened</th>
-                              <th className="font-medium py-1 pr-3">Closed</th>
+                              <th className="font-medium py-1 pr-3">Entrada</th>
+                              <th className="font-medium py-1 pr-3">Obertura</th>
+                              <th className="font-medium py-1 pr-3">Tancament</th>
                               <th className="font-medium py-1 pr-3">Lots</th>
-                              <th className="font-medium py-1 pr-3">Entry</th>
-                              <th className="font-medium py-1 pr-3">Exit</th>
+                              <th className="font-medium py-1 pr-3">Preu entrada</th>
+                              <th className="font-medium py-1 pr-3">Preu sortida</th>
                               <th className="font-medium py-1 text-right">P&amp;L</th>
                             </tr>
                           </thead>

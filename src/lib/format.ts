@@ -1,3 +1,5 @@
+export const DASHBOARD_TIME_ZONE = 'Europe/Madrid'
+
 export function formatCurrency(value: number, opts: { signed?: boolean } = {}): string {
   const sign = opts.signed && value > 0 ? '+' : ''
   return `${sign}${value.toLocaleString('en-US', {
@@ -13,14 +15,31 @@ export function formatPercent(value: number, digits = 1): string {
 }
 
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', {
+  return new Date(iso).toLocaleString('ca-ES', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: DASHBOARD_TIME_ZONE,
   })
 }
 
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+  return new Date(iso).toLocaleDateString('ca-ES', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: DASHBOARD_TIME_ZONE,
+  })
+}
+
+export function dashboardDateKey(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: DASHBOARD_TIME_ZONE,
+  }).formatToParts(new Date(iso))
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
 }

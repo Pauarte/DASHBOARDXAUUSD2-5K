@@ -1,9 +1,8 @@
 Hola! Per connectar el dashboard amb el compte MT5 live (730432938) necessito
-dues dades del bot que tens al VPS:
+dues confirmacions del bot que tens al VPS:
 
-1. El "magic number" del bot (l'identificador numeric que fa servir per marcar
-   les seves operacions). Surt al codi font de l'EA/script, normalment en una
-   linia com "input int Magic = 12345;" o similar.
+1. Confirma que el compte 730432938 és exclusiu d'aquest bot i que no hi ha
+   operacions manuals ni cap altre bot operant XAUUSD al mateix compte.
 
 2. La ruta del terminal MT5 al VPS (el fitxer terminal64.exe), per exemple:
    C:\Program Files\MetaTrader 5\terminal64.exe

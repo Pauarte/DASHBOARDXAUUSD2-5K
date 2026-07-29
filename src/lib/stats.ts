@@ -1,4 +1,5 @@
 import type { Trade } from './types'
+import { dashboardDateKey } from './format'
 
 export interface EquityPoint {
   time: string
@@ -89,7 +90,12 @@ export function groupIntoBaskets(trades: Trade[]): Basket[] {
   })
 }
 
-export function buildEquityCurve(trades: Trade[], startBalance: number): EquityPoint[] {
+export function buildEquityCurve(
+  trades: Trade[],
+  startBalance: number,
+  currentBalance?: number,
+  currentTime?: string | null,
+): EquityPoint[] {
   let peak = startBalance
   const points: EquityPoint[] = [
     { time: trades[0]?.openTime ?? new Date().toISOString(), balance: startBalance, drawdownPct: 0 },
@@ -101,13 +107,26 @@ export function buildEquityCurve(trades: Trade[], startBalance: number): EquityP
     points.push({ time: trade.closeTime, balance: trade.balanceAfter, drawdownPct })
   }
 
+  if (currentBalance !== undefined) {
+    const lastPoint = points[points.length - 1]
+    if (Math.abs(lastPoint.balance - currentBalance) >= 0.01) {
+      peak = Math.max(peak, currentBalance)
+      const drawdownPct = peak > 0 ? ((currentBalance - peak) / peak) * 100 : 0
+      points.push({
+        time: currentTime ?? new Date().toISOString(),
+        balance: currentBalance,
+        drawdownPct,
+      })
+    }
+  }
+
   return points
 }
 
 export function buildDailyPnl(trades: Trade[]): DailyPnl[] {
   const map = new Map<string, number>()
   for (const trade of trades) {
-    const day = trade.closeTime.slice(0, 10)
+    const day = dashboardDateKey(trade.closeTime)
     map.set(day, Number(((map.get(day) ?? 0) + trade.pnl).toFixed(2)))
   }
   return Array.from(map.entries())
@@ -136,9 +155,9 @@ export function computeStats(trades: Trade[], startBalance: number): AccountStat
     maxDrawdownMoney = Math.min(maxDrawdownMoney, t.balanceAfter - peak)
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = dashboardDateKey(new Date().toISOString())
   const todayPnl = trades
-    .filter((t) => t.closeTime.slice(0, 10) === today)
+    .filter((t) => dashboardDateKey(t.closeTime) === today)
     .reduce((s, t) => s + t.pnl, 0)
 
   const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0

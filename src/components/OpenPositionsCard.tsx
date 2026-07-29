@@ -5,11 +5,13 @@ export function OpenPositionsCard({ positions }: { positions: OpenPosition[] }) 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Open positions</h3>
-        <span className="text-xs text-[var(--text-muted)]">{positions.length} active</span>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Posicions obertes</h3>
+        <span className="text-xs text-[var(--text-muted)]">
+          {positions.length} {positions.length === 1 ? 'activa' : 'actives'}
+        </span>
       </div>
       {positions.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">No open positions.</p>
+        <p className="text-sm text-[var(--text-muted)]">No hi ha posicions obertes.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {positions.map((p) => (
@@ -26,7 +28,7 @@ export function OpenPositionsCard({ positions }: { positions: OpenPosition[] }) 
                   {p.lots.toFixed(2)}
                 </span>
                 <span className="text-xs text-[var(--text-muted)]">
-                  Opened {formatDateTime(p.openTime)} @ {p.entryPrice.toFixed(2)}
+                  Oberta {formatDateTime(p.openTime)} @ {p.entryPrice.toFixed(2)}
                 </span>
               </div>
               <span
