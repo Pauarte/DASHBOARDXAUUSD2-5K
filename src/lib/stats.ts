@@ -63,6 +63,7 @@ export interface AccountStats {
   maxDrawdownPct: number
   maxDrawdownMoney: number
   todayPnl: number
+  avgDailyReturnPct: number
 }
 
 export function groupIntoBaskets(trades: Trade[]): Basket[] {
@@ -144,6 +145,21 @@ export function computeStats(trades: Trade[], startBalance: number): AccountStat
   const avgWin = wins.length > 0 ? grossProfit / wins.length : 0
   const avgLoss = losses.length > 0 ? grossLoss / losses.length : 0
 
+  // Average of each trading day's return, as a % of that day's starting
+  // balance — not total return divided by day count, so a big early day
+  // doesn't get diluted by the (larger) balance of later days.
+  const daily = buildDailyPnl(trades)
+  let dayStartBalance = startBalance
+  const dailyReturnPcts: number[] = []
+  for (const day of daily) {
+    if (dayStartBalance > 0) dailyReturnPcts.push((day.pnl / dayStartBalance) * 100)
+    dayStartBalance = Number((dayStartBalance + day.pnl).toFixed(2))
+  }
+  const avgDailyReturnPct =
+    dailyReturnPcts.length > 0
+      ? dailyReturnPcts.reduce((s, p) => s + p, 0) / dailyReturnPcts.length
+      : 0
+
   return {
     totalTrades,
     wins: wins.length,
@@ -158,5 +174,6 @@ export function computeStats(trades: Trade[], startBalance: number): AccountStat
     maxDrawdownPct,
     maxDrawdownMoney,
     todayPnl: Number(todayPnl.toFixed(2)),
+    avgDailyReturnPct,
   }
 }

@@ -14,7 +14,7 @@ const REFRESH_INTERVAL_MS = 30_000
 // dashboard show a moving "start balance" instead of the real one. Only
 // change this number if money is actually deposited into or withdrawn
 // from the account.
-const ACCOUNT_START_BALANCE = 2500
+const ACCOUNT_START_BALANCE = 2496.6
 
 export interface WorstFloating {
   value: number

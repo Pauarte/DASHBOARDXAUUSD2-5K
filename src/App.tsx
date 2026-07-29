@@ -4,7 +4,6 @@ import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
 import { useAccountData } from './lib/useAccountData'
 import { StatTile } from './components/StatTile'
 import { EquityCurveChart } from './components/EquityCurveChart'
-import { DrawdownChart } from './components/DrawdownChart'
 import { DailyPnlChart } from './components/DailyPnlChart'
 import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
@@ -98,10 +97,9 @@ function App() {
           />
           <StatTile label="Win rate" value={formatPercent(stats.winRate)} />
           <StatTile
-            label="Max drawdown"
-            value={formatPercent(stats.maxDrawdownPct)}
-            sub={formatCurrency(stats.maxDrawdownMoney)}
-            tone="critical"
+            label="Avg daily %"
+            value={formatPercent(stats.avgDailyReturnPct, 2)}
+            tone={stats.avgDailyReturnPct >= 0 ? 'good' : 'critical'}
           />
           <StatTile
             label="Best / worst trade"
@@ -122,10 +120,7 @@ function App() {
 
         <EquityCurveChart data={equityCurve} />
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DrawdownChart data={equityCurve} />
-          <DailyPnlChart data={dailyPnl} />
-        </section>
+        <DailyPnlChart data={dailyPnl} />
 
         <CalendarHeatmap trades={trades} />
 
