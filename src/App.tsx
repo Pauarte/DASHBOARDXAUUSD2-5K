@@ -8,6 +8,8 @@ import { DailyPnlChart } from './components/DailyPnlChart'
 import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
+import { ConnectionStatus } from './components/ConnectionStatus'
+import { useConnectionAlerts } from './lib/useConnectionAlerts'
 
 function App() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -36,7 +38,24 @@ function App() {
     floatingHistory,
     lastSyncAt,
     isStale,
+    syncAgeSeconds,
+    lastCheckedAt,
+    connectionError,
   } = useAccountData()
+  const hasConnectionAlert = isLive && (isStale || Boolean(connectionError))
+  const connectionAlertBody = connectionError
+    ? 'No s’ha pogut consultar Supabase. El monitor conserva les últimes dades rebudes.'
+    : 'Fa més de 3 minuts que no arriben dades noves del bot.'
+  const {
+    alertsEnabled,
+    permission: alertPermission,
+    requestAlerts,
+    disableAlerts,
+  } = useConnectionAlerts(hasConnectionAlert, isLive, connectionAlertBody)
+
+  useEffect(() => {
+    document.title = hasConnectionAlert ? '[ALERTA] Monitor Bots Trading' : 'Monitor Bots Trading'
+  }, [hasConnectionAlert])
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = useMemo(
@@ -59,12 +78,10 @@ function App() {
             <h1 className="text-lg font-semibold">Monitor Bots Trading</h1>
             <p className="text-xs text-[var(--text-muted)]">
               {loading
-                ? 'Loading…'
+                ? 'Carregant…'
                 : isLive
-                  ? isStale
-                    ? `Data connection stale${lastSyncAt ? ` since ${formatDateTime(lastSyncAt)}` : ''}`
-                    : `Connected to Supabase — last sync ${lastSyncAt ? formatDateTime(lastSyncAt) : 'now'}`
-                  : 'Demo data — waiting for the sync script to write real trades'}
+                  ? 'Dades reals de MT5 sincronitzades mitjançant Supabase'
+                  : 'Esperant que el sincronitzador publiqui dades reals'}
             </p>
           </div>
           <div className="text-right">
@@ -80,14 +97,39 @@ function App() {
           </div>
         </div>
       </header>
-      {isLive && isStale && (
-        <div className="border-b border-amber-700/40 bg-amber-950/40 px-6 py-3 text-center text-sm text-amber-200">
-          Live data has not updated for more than 3 minutes. MT5 values shown below may be outdated.
+      {connectionError && (
+        <div
+          className="border-b border-red-700/40 bg-red-950/50 px-6 py-3 text-center text-sm text-red-100"
+          role="alert"
+        >
+          No s’ha pogut consultar Supabase. Es conserven les últimes dades rebudes.
+        </div>
+      )}
+      {!connectionError && isLive && isStale && (
+        <div
+          className="border-b border-amber-700/40 bg-amber-950/40 px-6 py-3 text-center text-sm text-amber-100"
+          role="alert"
+        >
+          Fa més de 3 minuts que no arriben dades noves. Els valors poden estar desactualitzats.
         </div>
       )}
       {installPrompt && <button onClick={installApp} className="fixed bottom-4 right-4 z-10 rounded-full border border-[var(--border)] bg-[var(--surface-card)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] shadow-lg hover:text-[var(--text-primary)]">Instal·lar app</button>}
 
       <main className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
+        <ConnectionStatus
+          loading={loading}
+          isLive={isLive}
+          isStale={isStale}
+          syncAgeSeconds={syncAgeSeconds}
+          lastSyncAt={lastSyncAt}
+          lastCheckedAt={lastCheckedAt}
+          connectionError={connectionError}
+          alertsEnabled={alertsEnabled}
+          permission={alertPermission}
+          onEnableAlerts={() => void requestAlerts()}
+          onDisableAlerts={disableAlerts}
+        />
+
         <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatTile label="Balance" value={formatCurrency(account.balance)} />
           <StatTile
