@@ -249,21 +249,38 @@ def record_floating_snapshot(account):
 
 
 def check_for_update():
+    temporary_path = f"{SELF_PATH}.new"
     try:
         with urllib.request.urlopen(SELF_UPDATE_URL, timeout=10) as resp:
             remote_code = resp.read()
-    except Exception as exc:
-        log(f"Update check failed (ignoring): {exc!r}")
-        return
 
-    with open(SELF_PATH, "rb") as f:
-        local_code = f.read()
+        with open(SELF_PATH, "rb") as f:
+            local_code = f.read()
 
-    if remote_code and remote_code != local_code:
-        log("New version available on GitHub — updating and restarting…")
-        with open(SELF_PATH, "wb") as f:
+        if not remote_code or remote_code == local_code:
+            return
+        if b"def main(" not in remote_code:
+            raise RuntimeError("downloaded update does not look like the sync script")
+
+        # Validate before touching the running file. Writing to a temporary
+        # sibling and replacing atomically prevents a network/process failure
+        # from leaving a truncated Python file on disk.
+        compile(remote_code, SELF_PATH, "exec")
+        with open(temporary_path, "wb") as f:
             f.write(remote_code)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, SELF_PATH)
+
+        log("Validated update installed atomically — restarting…")
         os.execv(sys.executable, [sys.executable, SELF_PATH])
+    except Exception as exc:
+        try:
+            if os.path.exists(temporary_path):
+                os.remove(temporary_path)
+        except OSError:
+            pass
+        log(f"Update check failed (ignoring): {exc!r}")
 
 
 def main():

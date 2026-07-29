@@ -33,19 +33,22 @@ account = mt5.account_info()
 assert account.login == 730432938    # sanity check, fail loudly if wrong account
 
 SYMBOL_FILTER = "XAUUSD"
+MAGIC_FILTER = 20260723122
 ```
 
 - Closed trades: `mt5.history_deals_get(from_date, to_date)`, filter by
   `d.symbol == SYMBOL_FILTER`, then **group deals by
   `d.position_id`** — each group with both an entry (`DEAL_ENTRY_IN`) and an exit
   (`DEAL_ENTRY_OUT` / `DEAL_ENTRY_OUT_BY`) deal is one fully closed position.
-- Open positions: `mt5.positions_get(symbol=SYMBOL_FILTER)`.
+  Require `MAGIC_FILTER` on the entry deal only; Bitget may store zero or a
+  different magic on the closing deal.
+- Open positions: `mt5.positions_get(symbol=SYMBOL_FILTER)`, filtered by
+  `position.magic == MAGIC_FILTER`.
 - Balance/equity: `mt5.account_info()`.
 
-This account is dedicated to this bot, so the monitor tracks every XAUUSD
-position on the account. Bitget does not preserve the MT5 magic number reliably
-on every order/deal; filtering by magic caused valid trades and floating P&L to
-disappear from the dashboard.
+Filtering by the entry magic prevents old or manual XAUUSD operations from
+entering the dashboard while still accepting exits whose magic was not preserved
+by Bitget.
 
 **Important:** insert **one row per closed MT5 position** — do NOT pre-group
 baskets (e.g. 3 positions this bot opened and closed together) into a single row.
