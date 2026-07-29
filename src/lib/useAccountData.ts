@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from './supabaseClient'
 import { mockAccount, mockOpenPositions, mockTrades } from './mockData'
 import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from './types'
+import type { FloatingPoint } from './stats'
 
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
 const REFRESH_INTERVAL_MS = 30_000
@@ -27,6 +28,7 @@ interface AccountData {
   isLive: boolean
   loading: boolean
   worstFloating: WorstFloating | null
+  floatingHistory: FloatingPoint[]
 }
 
 const FALLBACK: AccountData = {
@@ -36,6 +38,7 @@ const FALLBACK: AccountData = {
   isLive: false,
   loading: false,
   worstFloating: null,
+  floatingHistory: [],
 }
 
 interface TradeRow {
@@ -77,7 +80,7 @@ export function useAccountData(): AccountData {
     let cancelled = false
 
     async function load() {
-      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes] = await Promise.all([
+      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes, floatingHistoryRes] = await Promise.all([
         supabase!
           .from('trades')
           .select('id, direction, lots, entry_price, exit_price, open_time, close_time, pnl, exit_reason')
@@ -96,6 +99,18 @@ export function useAccountData(): AccountData {
           .order('floating_pnl', { ascending: true })
           .limit(1)
           .maybeSingle()
+          .then(
+            (res) => res,
+            () => ({ data: null, error: null }),
+          ),
+        // Full history (not just the worst point), used to find the worst
+        // floating reached during each individual closed operation.
+        supabase!
+          .from('floating_pnl_snapshots')
+          .select('floating_pnl, recorded_at')
+          .eq('account', ACCOUNT_ID)
+          .order('recorded_at', { ascending: true })
+          .limit(5000)
           .then(
             (res) => res,
             () => ({ data: null, error: null }),
@@ -150,6 +165,10 @@ export function useAccountData(): AccountData {
         ? { value: Number(worstRow.floating_pnl), at: worstRow.recorded_at }
         : null
 
+      const floatingHistory: FloatingPoint[] = (
+        (floatingHistoryRes.data as Array<{ floating_pnl: string | number; recorded_at: string }> | null) ?? []
+      ).map((r) => ({ recordedAt: r.recorded_at, floatingPnl: Number(r.floating_pnl) }))
+
       setData({
         trades,
         openPositions,
@@ -163,6 +182,7 @@ export function useAccountData(): AccountData {
         isLive: true,
         loading: false,
         worstFloating,
+        floatingHistory,
       })
     }
 

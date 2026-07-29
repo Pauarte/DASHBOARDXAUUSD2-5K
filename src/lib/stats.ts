@@ -26,6 +26,29 @@ export interface Basket {
 
 const BASKET_CLOSE_GAP_SECONDS = 3
 
+export interface FloatingPoint {
+  recordedAt: string
+  floatingPnl: number
+}
+
+// Worst (most negative) account-wide floating P&L recorded while this
+// basket was open — how deep it went underwater before closing. Reads
+// from the whole-account floating history, so if two baskets were ever
+// open at once this would include the other one's contribution too; in
+// practice this bot runs one basket at a time.
+export function worstFloatingDuringBasket(history: FloatingPoint[], basket: Basket): number | null {
+  const openTime = Math.min(...basket.legs.map((l) => new Date(l.openTime).getTime()))
+  const closeTime = new Date(basket.closeTime).getTime()
+
+  let worst: number | null = null
+  for (const point of history) {
+    const t = new Date(point.recordedAt).getTime()
+    if (t < openTime || t > closeTime) continue
+    if (worst === null || point.floatingPnl < worst) worst = point.floatingPnl
+  }
+  return worst
+}
+
 export interface AccountStats {
   totalTrades: number
   wins: number

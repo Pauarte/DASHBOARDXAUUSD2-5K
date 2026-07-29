@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { groupIntoBaskets } from '../lib/stats'
+import { groupIntoBaskets, worstFloatingDuringBasket, type FloatingPoint } from '../lib/stats'
 import type { Trade } from '../lib/types'
 import { formatCurrency, formatDateTime } from '../lib/format'
 
@@ -8,7 +8,13 @@ const directionStyle: Record<Trade['direction'], string> = {
   SELL: 'text-[var(--critical)] bg-[var(--critical)]/10',
 }
 
-export function TradeHistoryTable({ trades }: { trades: Trade[] }) {
+export function TradeHistoryTable({
+  trades,
+  floatingHistory,
+}: {
+  trades: Trade[]
+  floatingHistory: FloatingPoint[]
+}) {
   const baskets = [...groupIntoBaskets(trades)].reverse().slice(0, 20)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -37,6 +43,7 @@ export function TradeHistoryTable({ trades }: { trades: Trade[] }) {
               <th className="font-medium py-2 pr-3">Cistelles</th>
               <th className="font-medium py-2 pr-3">Lots</th>
               <th className="font-medium py-2 pr-3">Avg entry</th>
+              <th className="font-medium py-2 pr-3 text-right">Worst floating</th>
               <th className="font-medium py-2 text-right">P&amp;L</th>
             </tr>
           </thead>
@@ -48,6 +55,7 @@ export function TradeHistoryTable({ trades }: { trades: Trade[] }) {
               const totalLots = basket.legs.reduce((s, l) => s + l.lots, 0)
               const avgEntry =
                 basket.legs.reduce((s, l) => s + l.entryPrice * l.lots, 0) / (totalLots || 1)
+              const worstFloating = worstFloatingDuringBasket(floatingHistory, basket)
 
               return (
                 <>
@@ -84,6 +92,15 @@ export function TradeHistoryTable({ trades }: { trades: Trade[] }) {
                       {avgEntry.toFixed(2)}
                     </td>
                     <td
+                      className={`py-2 pr-3 text-right tabular ${
+                        worstFloating !== null && worstFloating < 0
+                          ? 'text-[var(--critical)]'
+                          : 'text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      {worstFloating !== null ? formatCurrency(worstFloating, { signed: true }) : '—'}
+                    </td>
+                    <td
                       className={`py-2 text-right tabular font-semibold ${
                         basket.pnl >= 0 ? 'text-[var(--good-text)]' : 'text-[var(--critical)]'
                       }`}
@@ -94,7 +111,7 @@ export function TradeHistoryTable({ trades }: { trades: Trade[] }) {
                   {isOpen && (
                     <tr key={`${key}-detail`} className="border-b border-[var(--border)] last:border-0">
                       <td className="py-2 pl-3" />
-                      <td colSpan={6} className="py-2 pr-3">
+                      <td colSpan={7} className="py-2 pr-3">
                         <table className="w-full text-[11px]">
                           <thead>
                             <tr className="text-left text-[var(--text-muted)]">

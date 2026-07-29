@@ -27,7 +27,7 @@ function App() {
     setInstallPrompt(null)
   }
 
-  const { trades, openPositions, account, isLive, loading, worstFloating } = useAccountData()
+  const { trades, openPositions, account, isLive, loading, worstFloating, floatingHistory } = useAccountData()
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = useMemo(
@@ -131,7 +131,7 @@ function App() {
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
-            <TradeHistoryTable trades={trades} />
+            <TradeHistoryTable trades={trades} floatingHistory={floatingHistory} />
           </div>
           <OpenPositionsCard positions={openPositions} />
         </section>
