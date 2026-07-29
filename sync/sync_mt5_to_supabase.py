@@ -97,7 +97,14 @@ def ensure_connected():
 
 def sync_closed_trades():
     offset = server_utc_offset_seconds()
-    to_date = datetime.datetime.now()
+    # history_deals_get compares against MT5's own (server-clock) time frame,
+    # not true UTC. Passing a plain datetime.now() as "to_date" meant any
+    # deal MT5 had already timestamped a few hours ahead (the same server
+    # offset fixed above) looked like it was "in the future" and got
+    # excluded — so freshly closed trades didn't show up until real time
+    # caught up to the server's clock, a ~3h lag. Shift the query bounds
+    # into the server's frame too, so "now" actually means now.
+    to_date = datetime.datetime.fromtimestamp(time.time() + offset, tz=datetime.timezone.utc)
     from_date = to_date - datetime.timedelta(days=HISTORY_LOOKBACK_DAYS)
 
     deals = mt5.history_deals_get(from_date, to_date)
