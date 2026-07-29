@@ -6,6 +6,15 @@ import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
 const REFRESH_INTERVAL_MS = 30_000
 
+// The actual initial deposit into this account. Fixed on purpose, not
+// derived from balance/trade data — deriving it as "current balance minus
+// synced trades' P&L" silently drifted upward whenever a trade was missing
+// from the trades table (lookback window, sync gaps, etc.), which made the
+// dashboard show a moving "start balance" instead of the real one. Only
+// change this number if money is actually deposited into or withdrawn
+// from the account.
+const ACCOUNT_START_BALANCE = 2500
+
 export interface WorstFloating {
   value: number
   at: string
@@ -103,9 +112,8 @@ export function useAccountData(): AccountData {
       }
 
       const snapshot = snapshotRes.data as AccountSnapshotRow
-      const totalPnl = tradeRows.reduce((sum, r) => sum + Number(r.pnl), 0)
       const currentBalance = Number(snapshot.balance)
-      const startBalance = Number((currentBalance - totalPnl).toFixed(2))
+      const startBalance = ACCOUNT_START_BALANCE
 
       let running = startBalance
       const trades: Trade[] = tradeRows.map((r) => {
