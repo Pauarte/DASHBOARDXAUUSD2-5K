@@ -1,32 +1,20 @@
-# React + TypeScript + Vite
+# Dashboard XAUUSD R2-A
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Dashboard públic de només lectura per seguir el bot R2-A.
 
-Currently, two official plugins are available:
+## Anàlisi diària
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `GET /api/analysis-context` exposa només mètriques agregades i no inclou el login del compte.
+- `/analisis` mostra els informes del repositori separat `Gartecz/R2A-Analisis-Diaris`.
+- El navegador només descarrega els informes del mes seleccionat.
+- L’agent analista no pot operar MT5 ni modificar aquest repositori.
 
-## React Compiler
+## Desenvolupament
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci
+npm run build
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Les variables de Vercel continuen sent `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` i `VITE_MT5_ACCOUNT`.

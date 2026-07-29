@@ -91,6 +91,12 @@ function App() {
               >
                 Repartiment de capital
               </a>
+              <a
+                href="/analisis"
+                className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]"
+              >
+                Anàlisi diària
+              </a>
             </div>
             <p className="text-xs text-[var(--text-muted)]">
               {loading
