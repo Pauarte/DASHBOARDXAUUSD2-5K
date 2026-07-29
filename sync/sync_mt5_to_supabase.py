@@ -15,7 +15,9 @@ Setup on the VPS:
 
 import datetime
 import os
+import sys
 import time
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
@@ -36,6 +38,16 @@ MAGIC_FILTER = int(os.environ["MT5_MAGIC_NUMBER"])
 SYMBOL_FILTER = "XAUUSD"
 POLL_SECONDS = 60
 HISTORY_LOOKBACK_DAYS = 30
+
+# Self-update: check GitHub for a newer version of this file every N passes,
+# and if it changed, overwrite this file on disk and restart the process —
+# so pushing a fix means the VPS picks it up on its own within a few
+# minutes, no manual redeploy needed.
+SELF_UPDATE_URL = (
+    "https://raw.githubusercontent.com/Pauarte/DASHBOARDXAUUSD2-5K/main/sync/sync_mt5_to_supabase.py"
+)
+SELF_UPDATE_EVERY_N_PASSES = 3
+SELF_PATH = os.path.abspath(__file__)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -236,8 +248,27 @@ def record_floating_snapshot(account):
     return floating_pnl
 
 
+def check_for_update():
+    try:
+        with urllib.request.urlopen(SELF_UPDATE_URL, timeout=10) as resp:
+            remote_code = resp.read()
+    except Exception as exc:
+        log(f"Update check failed (ignoring): {exc!r}")
+        return
+
+    with open(SELF_PATH, "rb") as f:
+        local_code = f.read()
+
+    if remote_code and remote_code != local_code:
+        log("New version available on GitHub — updating and restarting…")
+        with open(SELF_PATH, "wb") as f:
+            f.write(remote_code)
+        os.execv(sys.executable, [sys.executable, SELF_PATH])
+
+
 def main():
     log(f"Starting MT5 sync for account {ACCOUNT_LOGIN}; interval={POLL_SECONDS}s.")
+    pass_count = 0
     while True:
         pass_started = time.monotonic()
         try:
@@ -255,6 +286,10 @@ def main():
             )
         except Exception as exc:  # one bad pass must not kill the loop
             log(f"Sync pass failed: {exc!r}")
+
+        pass_count += 1
+        if pass_count % SELF_UPDATE_EVERY_N_PASSES == 0:
+            check_for_update()
 
         elapsed = time.monotonic() - pass_started
         time.sleep(max(1, POLL_SECONDS - elapsed))
