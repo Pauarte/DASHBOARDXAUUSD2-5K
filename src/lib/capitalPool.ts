@@ -61,7 +61,10 @@ export function personValueOverTime(
       if (row.personName === personName) personUnits += row.unitsDelta
       rowIndex += 1
     }
-    if (totalUnits > 0) {
+    // Skip everything before this person's first contribution — otherwise
+    // the chart shows a flat $0 line for the whole account history before
+    // they even joined, instead of starting right at their own first value.
+    if (totalUnits > 0 && personUnits > 0) {
       points.push({ time: snapshot.recordedAt, value: (personUnits / totalUnits) * snapshot.balance })
     }
   }
