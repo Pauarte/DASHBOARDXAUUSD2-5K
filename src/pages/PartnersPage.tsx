@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { useAccountData } from '../lib/useAccountData'
 import {
   computeStakes,
+  personTodayChange,
   personValueOverTime,
   unitsForAmount,
   type ContributionRow,
@@ -171,6 +172,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
     [rows, identity.personName, balanceHistory],
   )
   const myGainLoss = myStake ? myStake.currentValue - myStake.netContributed : 0
+  const myTodayChange = myStake ? personTodayChange(myValueHistory, myStake.currentValue) : { pnl: 0, pct: 0 }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -278,12 +280,21 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
 
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">El teu dashboard</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatTile label="El teu valor" value={myStake ? formatCurrency(myStake.currentValue) : '—'} />
-            <StatTile label="El teu %" value={myStake ? formatPercent(myStake.percentage, 1) : '—'} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatTile
               label="Aportat net"
               value={myStake ? formatCurrency(myStake.netContributed, { signed: true }) : '—'}
+            />
+            <StatTile label="Valor actual" value={myStake ? formatCurrency(myStake.currentValue) : '—'} />
+            <StatTile
+              label="P&L d'avui"
+              value={myStake ? formatCurrency(myTodayChange.pnl, { signed: true }) : '—'}
+              tone={myTodayChange.pnl >= 0 ? 'good' : 'critical'}
+            />
+            <StatTile
+              label="% fet avui"
+              value={myStake ? formatPercent(myTodayChange.pct, 2) : '—'}
+              tone={myTodayChange.pct >= 0 ? 'good' : 'critical'}
             />
             <StatTile
               label="Guany / pèrdua"

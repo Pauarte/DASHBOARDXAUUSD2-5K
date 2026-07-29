@@ -1,3 +1,5 @@
+import { dashboardDateKey } from './format'
+
 export type ContributionType = 'deposit' | 'withdrawal'
 
 export interface ContributionRow {
@@ -70,6 +72,25 @@ export function personValueOverTime(
   }
 
   return points
+}
+
+// Today's $ and % change in a person's own value — measured from their
+// value at the start of today (Europe/Madrid), or from their first-ever
+// value point if they joined today (there's no "start of day" before that).
+export function personTodayChange(
+  valueHistory: PersonValuePoint[],
+  currentValue: number,
+): { pnl: number; pct: number } {
+  const today = dashboardDateKey(new Date().toISOString())
+  let startOfDayValue: number | null = null
+  for (const point of valueHistory) {
+    if (dashboardDateKey(point.time) < today) startOfDayValue = point.value
+  }
+  if (startOfDayValue === null) startOfDayValue = valueHistory[0]?.value ?? currentValue
+
+  const pnl = currentValue - startOfDayValue
+  const pct = startOfDayValue > 0 ? (pnl / startOfDayValue) * 100 : 0
+  return { pnl, pct }
 }
 
 export function computeStakes(rows: ContributionRow[], currentPoolValue: number): PersonStake[] {
