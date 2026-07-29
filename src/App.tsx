@@ -10,8 +10,18 @@ import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
 import { ConnectionStatus } from './components/ConnectionStatus'
 import { useConnectionAlerts } from './lib/useConnectionAlerts'
+import { PasswordGate } from './components/PasswordGate'
+import type { PartnerIdentity } from './lib/partnersAuth'
 
 function App() {
+  return (
+    <PasswordGate title="Monitor Bots Trading" subtitle="Introdueix la contrasenya per entrar.">
+      {(identity, onLogout) => <Dashboard identity={identity} onLogout={onLogout} />}
+    </PasswordGate>
+  )
+}
+
+function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   useEffect(() => {
     const handler = (event: Event) => {
@@ -97,8 +107,17 @@ function App() {
               >
                 Anàlisi diària
               </a>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-2)]"
+              >
+                Sortir
+              </button>
             </div>
             <p className="text-xs text-[var(--text-muted)]">
+              Connectat com a <span className="font-semibold">{identity.personName}</span>
+              {' · '}
               {loading
                 ? 'Carregant…'
                 : isLive

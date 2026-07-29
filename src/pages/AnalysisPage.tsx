@@ -5,6 +5,7 @@ import {
   type DailyAnalysis,
   type AnalysisStatus,
 } from '../lib/analysisReports'
+import { PasswordGate } from '../components/PasswordGate'
 
 const WEEKDAYS = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg']
 
@@ -42,6 +43,14 @@ function metric(value: number | null, suffix = '') {
 }
 
 export function AnalysisPage() {
+  return (
+    <PasswordGate title="Anàlisi diària R2-A" subtitle="Introdueix la contrasenya per entrar.">
+      {(_identity, onLogout) => <AnalysisDashboard onLogout={onLogout} />}
+    </PasswordGate>
+  )
+}
+
+function AnalysisDashboard({ onLogout }: { onLogout: () => void }) {
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [datesLoaded, setDatesLoaded] = useState(false)
   const [reports, setReports] = useState<DailyAnalysis[]>([])
@@ -105,12 +114,21 @@ export function AnalysisPage() {
             <h1 className="text-lg font-semibold">Anàlisi diària R2-A</h1>
             <p className="text-xs text-[var(--text-muted)]">Informes automàtics de només lectura</p>
           </div>
-          <a
-            href="/"
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-2)]"
-          >
-            Tornar al monitor
-          </a>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-2)]"
+            >
+              Sortir
+            </button>
+            <a
+              href="/"
+              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-2)]"
+            >
+              Tornar al monitor
+            </a>
+          </div>
         </div>
       </header>
 

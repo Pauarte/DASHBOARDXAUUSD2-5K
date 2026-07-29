@@ -11,15 +11,10 @@ import {
   type PersonStake,
 } from '../lib/capitalPool'
 import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
-import {
-  checkPassword,
-  clearIdentity,
-  loadStoredIdentity,
-  storeIdentity,
-  type PartnerIdentity,
-} from '../lib/partnersAuth'
+import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
 import { PersonalValueChart } from '../components/PersonalValueChart'
+import { PasswordGate } from '../components/PasswordGate'
 
 interface ContributionDbRow {
   id: number
@@ -48,62 +43,10 @@ function mapRow(r: ContributionDbRow): ContributionRow {
 }
 
 export function PartnersPage() {
-  const [identity, setIdentity] = useState<PartnerIdentity | null>(() => loadStoredIdentity())
-  const [password, setPassword] = useState('')
-  const [authError, setAuthError] = useState(false)
-
-  if (!identity) {
-    return (
-      <div className="min-h-screen bg-[var(--surface-2)] flex items-center justify-center px-6">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            const found = checkPassword(password)
-            if (found) {
-              storeIdentity(found)
-              setIdentity(found)
-              setAuthError(false)
-            } else {
-              setAuthError(true)
-            }
-          }}
-          className="w-full max-w-xs rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-6 flex flex-col gap-3"
-        >
-          <h1 className="text-base font-semibold text-[var(--text-primary)]">Repartiment de capital</h1>
-          <p className="text-xs text-[var(--text-muted)]">Introdueix la teva contrasenya per entrar.</p>
-          <input
-            type="password"
-            autoFocus
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value)
-              setAuthError(false)
-            }}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
-          />
-          {authError && <p className="text-xs text-[var(--critical)]">Contrasenya incorrecta.</p>}
-          <button
-            type="submit"
-            className="rounded-lg bg-[var(--series-blue)] px-4 py-2 text-sm font-semibold text-white"
-          >
-            Entrar
-          </button>
-          <a href="/" className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-center">
-            ← Tornar al dashboard
-          </a>
-        </form>
-      </div>
-    )
-  }
-
   return (
-    <PartnersDashboard
-      identity={identity}
-      onLogout={() => {
-        clearIdentity()
-        setIdentity(null)
-      }}
-    />
+    <PasswordGate title="Repartiment de capital" subtitle="Introdueix la teva contrasenya per entrar.">
+      {(identity, onLogout) => <PartnersDashboard identity={identity} onLogout={onLogout} />}
+    </PasswordGate>
   )
 }
 
