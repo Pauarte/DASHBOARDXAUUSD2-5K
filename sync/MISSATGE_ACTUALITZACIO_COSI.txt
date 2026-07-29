@@ -21,11 +21,11 @@ Què fa exactament:
    - El .env i la configuració de la tasca (reinici automàtic, etc.) no
      es toquen per a res.
 
-A partir d'ara, cada vegada que hi hagi una actualització, només cal
-tornar a executar aquest mateix .ps1. El sincronitzador ja no es modifica
-ni es reinicia a si mateix mentre està funcionant. El mateix actualitzador
-deixa la tasca amb reinici automàtic real si algun dia cau.
+A partir d'ara el sincronitzador comprova GitHub automàticament cada
+aproximadament 3 minuts. Abans d'instal·lar una versió nova en valida la
+sintaxi i la substitueix de forma atòmica; si la descàrrega falla, manté
+la versió actual i continua funcionant.
 
-Login (730432938) i símbol (XAUUSD) no canvien. El compte és exclusiu
-del bot i el sincronitzador llegeix totes les posicions XAUUSD perquè
-Bitget no conserva el magic number de manera fiable en tots els registres.
+Login (730432938), símbol (XAUUSD) i magic number (20260723122) no
+canvien. El magic es comprova a l'entrada de cada posició, no al deal de
+sortida, perquè Bitget no sempre el conserva al tancament.
