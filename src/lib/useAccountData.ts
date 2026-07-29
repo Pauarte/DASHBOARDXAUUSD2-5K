@@ -29,6 +29,8 @@ interface AccountData {
   loading: boolean
   worstFloating: WorstFloating | null
   floatingHistory: FloatingPoint[]
+  lastSyncAt: string | null
+  isStale: boolean
 }
 
 const FALLBACK: AccountData = {
@@ -39,6 +41,8 @@ const FALLBACK: AccountData = {
   loading: false,
   worstFloating: null,
   floatingHistory: [],
+  lastSyncAt: null,
+  isStale: true,
 }
 
 interface TradeRow {
@@ -67,6 +71,7 @@ interface AccountSnapshotRow {
   balance: string | number
   equity: string | number
   currency: string
+  updated_at: string
 }
 
 export function useAccountData(): AccountData {
@@ -90,7 +95,11 @@ export function useAccountData(): AccountData {
           .from('open_positions')
           .select('mt5_ticket, direction, lots, entry_price, current_price, open_time, floating_pnl')
           .eq('account', ACCOUNT_ID),
-        supabase!.from('account_snapshots').select('balance, equity, currency').eq('account', ACCOUNT_ID).maybeSingle(),
+        supabase!
+          .from('account_snapshots')
+          .select('balance, equity, currency, updated_at')
+          .eq('account', ACCOUNT_ID)
+          .maybeSingle(),
         // floating_pnl_snapshots may not exist yet on older deployments — tolerate the error.
         supabase!
           .from('floating_pnl_snapshots')
@@ -129,6 +138,8 @@ export function useAccountData(): AccountData {
       const snapshot = snapshotRes.data as AccountSnapshotRow
       const currentBalance = Number(snapshot.balance)
       const startBalance = ACCOUNT_START_BALANCE
+      const lastSyncAt = snapshot.updated_at
+      const isStale = Date.now() - Date.parse(lastSyncAt) > 3 * 60_000
 
       let running = startBalance
       const trades: Trade[] = tradeRows.map((r) => {
@@ -158,8 +169,6 @@ export function useAccountData(): AccountData {
         floatingPnl: Number(r.floating_pnl),
       }))
 
-      const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
-
       const worstRow = worstFloatingRes.data as { floating_pnl: string | number; recorded_at: string } | null
       const worstFloating: WorstFloating | null = worstRow
         ? { value: Number(worstRow.floating_pnl), at: worstRow.recorded_at }
@@ -175,7 +184,7 @@ export function useAccountData(): AccountData {
         account: {
           startBalance,
           balance: currentBalance,
-          equity: Number((currentBalance + floatingTotal).toFixed(2)),
+          equity: Number(snapshot.equity),
           currency: snapshot.currency,
           symbol: mockAccount.symbol,
         },
@@ -183,6 +192,8 @@ export function useAccountData(): AccountData {
         loading: false,
         worstFloating,
         floatingHistory,
+        lastSyncAt,
+        isStale,
       })
     }
 

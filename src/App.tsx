@@ -26,7 +26,17 @@ function App() {
     setInstallPrompt(null)
   }
 
-  const { trades, openPositions, account, isLive, loading, worstFloating, floatingHistory } = useAccountData()
+  const {
+    trades,
+    openPositions,
+    account,
+    isLive,
+    loading,
+    worstFloating,
+    floatingHistory,
+    lastSyncAt,
+    isStale,
+  } = useAccountData()
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = useMemo(
@@ -51,7 +61,9 @@ function App() {
               {loading
                 ? 'Loading…'
                 : isLive
-                  ? 'Connected to Supabase — live data'
+                  ? isStale
+                    ? `Data connection stale${lastSyncAt ? ` since ${formatDateTime(lastSyncAt)}` : ''}`
+                    : `Connected to Supabase — last sync ${lastSyncAt ? formatDateTime(lastSyncAt) : 'now'}`
                   : 'Demo data — waiting for the sync script to write real trades'}
             </p>
           </div>
@@ -68,6 +80,11 @@ function App() {
           </div>
         </div>
       </header>
+      {isLive && isStale && (
+        <div className="border-b border-amber-700/40 bg-amber-950/40 px-6 py-3 text-center text-sm text-amber-200">
+          Live data has not updated for more than 3 minutes. MT5 values shown below may be outdated.
+        </div>
+      )}
       {installPrompt && <button onClick={installApp} className="fixed bottom-4 right-4 z-10 rounded-full border border-[var(--border)] bg-[var(--surface-card)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] shadow-lg hover:text-[var(--text-primary)]">Instal·lar app</button>}
 
       <main className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
