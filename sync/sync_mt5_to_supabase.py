@@ -19,12 +19,17 @@ import sys
 import time
 import urllib.request
 from collections import defaultdict
+from pathlib import Path
 
 import MetaTrader5 as mt5
 from dotenv import load_dotenv
 from supabase import create_client
 
-load_dotenv()
+# Load .env from this script's own folder, not the process's current
+# working directory — the Scheduled Task (and the self-restart via
+# os.execv below) may launch this from a different CWD, which made plain
+# load_dotenv() silently find nothing and crash with KeyError.
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
