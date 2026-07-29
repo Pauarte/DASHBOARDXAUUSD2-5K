@@ -6,6 +6,7 @@ import type { FloatingPoint } from './stats'
 
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
 const REFRESH_INTERVAL_MS = 30_000
+export const STALE_AFTER_MS = 3 * 60_000
 
 // The actual initial deposit into this account. Fixed on purpose, not
 // derived from balance/trade data — deriving it as "current balance minus
@@ -31,9 +32,14 @@ interface AccountData {
   floatingHistory: FloatingPoint[]
   lastSyncAt: string | null
   isStale: boolean
+  syncAgeSeconds: number | null
+  lastCheckedAt: string | null
+  connectionError: string | null
 }
 
-const FALLBACK: AccountData = {
+type StoredAccountData = Omit<AccountData, 'isStale' | 'syncAgeSeconds'>
+
+const FALLBACK: StoredAccountData = {
   trades: mockTrades,
   openPositions: mockOpenPositions,
   account: mockAccount,
@@ -42,7 +48,8 @@ const FALLBACK: AccountData = {
   worstFloating: null,
   floatingHistory: [],
   lastSyncAt: null,
-  isStale: true,
+  lastCheckedAt: null,
+  connectionError: null,
 }
 
 interface TradeRow {
@@ -75,10 +82,16 @@ interface AccountSnapshotRow {
 }
 
 export function useAccountData(): AccountData {
-  const [data, setData] = useState<AccountData>({
+  const [data, setData] = useState<StoredAccountData>({
     ...FALLBACK,
     loading: isSupabaseConfigured,
   })
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 10_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!supabase) return
@@ -128,10 +141,17 @@ export function useAccountData(): AccountData {
 
       if (cancelled) return
 
+      const criticalError = tradesRes.error ?? positionsRes.error ?? snapshotRes.error
+      if (criticalError) throw criticalError
+
       const tradeRows = (tradesRes.data as TradeRow[] | null) ?? []
-      if (tradeRows.length === 0 || !snapshotRes.data) {
-        // the sync script hasn't written any data for this account yet
-        setData({ ...FALLBACK, loading: false })
+      const checkedAt = new Date().toISOString()
+      if (!snapshotRes.data) {
+        setData({
+          ...FALLBACK,
+          loading: false,
+          lastCheckedAt: checkedAt,
+        })
         return
       }
 
@@ -139,7 +159,6 @@ export function useAccountData(): AccountData {
       const currentBalance = Number(snapshot.balance)
       const startBalance = ACCOUNT_START_BALANCE
       const lastSyncAt = snapshot.updated_at
-      const isStale = Date.now() - Date.parse(lastSyncAt) > 3 * 60_000
 
       let running = startBalance
       const trades: Trade[] = tradeRows.map((r) => {
@@ -193,14 +212,22 @@ export function useAccountData(): AccountData {
         worstFloating,
         floatingHistory,
         lastSyncAt,
-        isStale,
+        lastCheckedAt: checkedAt,
+        connectionError: null,
       })
     }
 
     function loadAndCatch() {
       load().catch((error) => {
-        console.error('Failed to load Supabase account data, falling back to demo data', error)
-        if (!cancelled) setData({ ...FALLBACK, loading: false })
+        console.error('Failed to load Supabase account data', error)
+        if (!cancelled) {
+          setData((current) => ({
+            ...current,
+            loading: false,
+            lastCheckedAt: new Date().toISOString(),
+            connectionError: error instanceof Error ? error.message : 'No s’ha pogut consultar Supabase',
+          }))
+        }
       })
     }
 
@@ -215,5 +242,13 @@ export function useAccountData(): AccountData {
     }
   }, [])
 
-  return data
+  const syncAgeSeconds = data.lastSyncAt
+    ? Math.max(0, Math.floor((now - Date.parse(data.lastSyncAt)) / 1000))
+    : null
+
+  return {
+    ...data,
+    syncAgeSeconds,
+    isStale: syncAgeSeconds === null || syncAgeSeconds * 1000 > STALE_AFTER_MS,
+  }
 }

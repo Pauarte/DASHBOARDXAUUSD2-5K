@@ -81,3 +81,87 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+.connection-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-card);
+  padding: 1rem;
+}
+
+.connection-card__main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.connection-card__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.connection-card__dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.connection-card__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.connection-card--good .connection-card__dot {
+  background: var(--good);
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--good) 18%, transparent);
+}
+
+.connection-card--warning .connection-card__dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+.connection-card--critical .connection-card__dot {
+  background: var(--critical);
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--critical) 18%, transparent);
+}
+
+.connection-card__alerts {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.connection-card__alerts:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.connection-card__alerts:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 640px) {
+  .connection-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
