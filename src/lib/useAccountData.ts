@@ -30,6 +30,7 @@ interface AccountData {
   loading: boolean
   worstFloating: WorstFloating | null
   floatingHistory: FloatingPoint[]
+  totalNetCapital: number
   lastSyncAt: string | null
   isStale: boolean
   syncAgeSeconds: number | null
@@ -47,6 +48,7 @@ const FALLBACK: StoredAccountData = {
   loading: false,
   worstFloating: null,
   floatingHistory: [],
+  totalNetCapital: ACCOUNT_START_BALANCE,
   lastSyncAt: null,
   lastCheckedAt: null,
   connectionError: null,
@@ -98,7 +100,7 @@ export function useAccountData(): AccountData {
     let cancelled = false
 
     async function load() {
-      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes, floatingHistoryRes] = await Promise.all([
+      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes, floatingHistoryRes, capitalRes] = await Promise.all([
         supabase!
           .from('trades')
           .select('id, direction, lots, entry_price, exit_price, open_time, close_time, pnl, exit_reason')
@@ -133,6 +135,17 @@ export function useAccountData(): AccountData {
           .eq('account', ACCOUNT_ID)
           .order('recorded_at', { ascending: true })
           .limit(5000)
+          .then(
+            (res) => res,
+            () => ({ data: null, error: null }),
+          ),
+        // Partner deposits/withdrawals (from /socis) — the real "how much
+        // money is currently invested" baseline, which grows/shrinks every
+        // time someone adds or takes out capital. Tolerate the table not
+        // existing yet.
+        supabase!
+          .from('capital_contributions')
+          .select('type, amount')
           .then(
             (res) => res,
             () => ({ data: null, error: null }),
@@ -197,6 +210,11 @@ export function useAccountData(): AccountData {
         (floatingHistoryRes.data as Array<{ floating_pnl: string | number; recorded_at: string }> | null) ?? []
       ).map((r) => ({ recordedAt: r.recorded_at, floatingPnl: Number(r.floating_pnl) }))
 
+      const capitalRows = (capitalRes.data as Array<{ type: 'deposit' | 'withdrawal'; amount: string | number }> | null) ?? []
+      const totalNetCapital = capitalRows.length
+        ? capitalRows.reduce((sum, r) => sum + (r.type === 'deposit' ? Number(r.amount) : -Number(r.amount)), 0)
+        : ACCOUNT_START_BALANCE
+
       setData({
         trades,
         openPositions,
@@ -211,6 +229,7 @@ export function useAccountData(): AccountData {
         loading: false,
         worstFloating,
         floatingHistory,
+        totalNetCapital,
         lastSyncAt,
         lastCheckedAt: checkedAt,
         connectionError: null,

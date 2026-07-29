@@ -36,6 +36,7 @@ function App() {
     loading,
     worstFloating,
     floatingHistory,
+    totalNetCapital,
     lastSyncAt,
     isStale,
     syncAgeSeconds,
@@ -59,7 +60,10 @@ function App() {
 
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingPnl = account.equity - account.balance
-  const accountTotalPnl = account.balance - account.startBalance
+  // Real trading P&L: balance minus everything partners have ever put in
+  // or taken out (from /socis), not the bot's fixed genesis balance — so
+  // a partner deposit/withdrawal never shows up as a fake sync gap here.
+  const accountTotalPnl = account.balance - totalNetCapital
   const historyGap = Number((accountTotalPnl - stats.totalPnl).toFixed(2))
   const hasHistoryGap = isLive && Math.abs(historyGap) >= 0.01
   const equityCurve = useMemo(
@@ -68,7 +72,7 @@ function App() {
   )
   const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
 
-  const totalReturnPct = ((account.balance - account.startBalance) / account.startBalance) * 100
+  const totalReturnPct = ((account.balance - totalNetCapital) / totalNetCapital) * 100
 
   return (
     <div className="min-h-screen bg-[var(--surface-2)]">
@@ -100,7 +104,7 @@ function App() {
                 totalReturnPct >= 0 ? 'text-[var(--good-text)]' : 'text-[var(--critical)]'
               }`}
             >
-              {formatPercent(totalReturnPct, 1)} since {formatCurrency(account.startBalance)} start
+              {formatPercent(totalReturnPct, 1)} since {formatCurrency(totalNetCapital)} invested
             </div>
           </div>
         </div>
