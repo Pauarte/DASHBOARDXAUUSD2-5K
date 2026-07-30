@@ -1,4 +1,5 @@
 import { dashboardDateKey } from './format'
+import type { Trade } from './types'
 
 export type ContributionType = 'deposit' | 'withdrawal'
 
@@ -91,6 +92,27 @@ export function personTodayChange(
   const pnl = currentValue - startOfDayValue
   const pct = startOfDayValue > 0 ? (pnl / startOfDayValue) * 100 : 0
   return { pnl, pct }
+}
+
+// Rescales each trade's pnl to one person's own share, using the ownership
+// % that was actually true at that trade's close time (not their current
+// %) — so days/baskets from before they joined correctly show $0 for them
+// instead of applying today's % retroactively. Feed the result into
+// buildDailyPnl / CalendarHeatmap unchanged to get a personalized view.
+export function scaleTradesForPerson(trades: Trade[], rows: ContributionRow[], personName: string): Trade[] {
+  const sortedRows = [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+
+  return trades.map((trade) => {
+    let totalUnits = 0
+    let personUnits = 0
+    for (const row of sortedRows) {
+      if (row.createdAt > trade.closeTime) break
+      totalUnits += row.unitsDelta
+      if (row.personName === personName) personUnits += row.unitsDelta
+    }
+    const fraction = totalUnits > 0 ? personUnits / totalUnits : 0
+    return { ...trade, pnl: trade.pnl * fraction }
+  })
 }
 
 export function computeStakes(rows: ContributionRow[], currentPoolValue: number): PersonStake[] {

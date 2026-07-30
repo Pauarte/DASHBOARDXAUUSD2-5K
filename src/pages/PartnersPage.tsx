@@ -5,6 +5,7 @@ import {
   computeStakes,
   personTodayChange,
   personValueOverTime,
+  scaleTradesForPerson,
   unitsForAmount,
   type ContributionRow,
   type ContributionType,
@@ -56,7 +57,6 @@ export function PartnersPage() {
 function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
   const { account, isLive, trades, openPositions, worstFloating } = useAccountData()
   const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
-  const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
   const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
   const [rows, setRows] = useState<ContributionRow[]>([])
@@ -129,6 +129,11 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   const myTodayChange = myStake ? personTodayChange(myValueHistory, myStake.currentValue) : { pnl: 0, pct: 0 }
   const myShare = myStake ? myStake.percentage / 100 : 0
   const myFloating = myStake ? (floatingTotal * myStake.percentage) / 100 : 0
+  const myTrades = useMemo(
+    () => scaleTradesForPerson(trades, rows, identity.personName),
+    [trades, rows, identity.personName],
+  )
+  const dailyPnl = useMemo(() => buildDailyPnl(myTrades), [myTrades])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -299,7 +304,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             />
           </div>
           <DailyPnlChart data={dailyPnl} />
-          <CalendarHeatmap trades={trades} />
+          <CalendarHeatmap trades={myTrades} />
         </section>
 
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
