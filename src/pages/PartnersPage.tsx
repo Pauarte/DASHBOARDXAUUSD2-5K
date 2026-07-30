@@ -10,11 +10,15 @@ import {
   type ContributionType,
   type PersonStake,
 } from '../lib/capitalPool'
+import { buildDailyPnl, computeStats } from '../lib/stats'
 import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
+import { floatingSeverityPct } from '../lib/floatingRisk'
 import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
 import { PersonalValueChart } from '../components/PersonalValueChart'
 import { PasswordGate } from '../components/PasswordGate'
+import { DailyPnlChart } from '../components/DailyPnlChart'
+import { CalendarHeatmap } from '../components/CalendarHeatmap'
 
 interface ContributionDbRow {
   id: number
@@ -51,7 +55,10 @@ export function PartnersPage() {
 }
 
 function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
-  const { account, isLive } = useAccountData()
+  const { account, isLive, trades, openPositions, worstFloating } = useAccountData()
+  const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
+  const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
+  const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
   const [rows, setRows] = useState<ContributionRow[]>([])
   const [balanceHistory, setBalanceHistory] = useState<{ recordedAt: string; balance: number }[]>([])
@@ -116,6 +123,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   )
   const myGainLoss = myStake ? myStake.currentValue - myStake.netContributed : 0
   const myTodayChange = myStake ? personTodayChange(myValueHistory, myStake.currentValue) : { pnl: 0, pct: 0 }
+  const myFloating = myStake ? (floatingTotal * myStake.percentage) / 100 : 0
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -244,8 +252,55 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
               value={myStake ? formatCurrency(myGainLoss, { signed: true }) : '—'}
               tone={myGainLoss >= 0 ? 'good' : 'critical'}
             />
+            <StatTile
+              label="El teu floating"
+              value={myStake ? formatCurrency(myFloating, { signed: true }) : '—'}
+              sub={`${openPositions.length} posicions obertes`}
+              tone={myFloating >= 0 ? 'good' : 'critical'}
+            />
           </div>
           <PersonalValueChart data={myValueHistory} />
+
+          <p className="text-xs text-[var(--text-muted)] mt-2">
+            Estadístiques del bot — les mateixes que al dashboard principal, no depenen de qui les mira
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <StatTile
+              label="Floating P&L (bot)"
+              value={formatPercent(floatingSeverityPct(floatingTotal, account.balance), 0)}
+              sub={`${formatCurrency(floatingTotal, { signed: true })} · ${openPositions.length} posicions obertes`}
+              tone={floatingTotal >= 0 ? 'good' : 'critical'}
+            />
+            <StatTile
+              label="Pitjor floating registrat"
+              value={worstFloating ? formatPercent(worstFloating.pct, 0) : '—'}
+              sub={worstFloating ? formatCurrency(worstFloating.value, { signed: true }) : 'Encara sense dades'}
+              tone="critical"
+            />
+            <StatTile
+              label="Operacions tancades"
+              value={stats.totalTrades.toString()}
+              sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakEvens}BE`}
+            />
+            <StatTile label="Win rate" value={formatPercent(stats.winRate)} />
+            <StatTile
+              label="Mitjana diària"
+              value={formatPercent(stats.avgDailyReturnPct, 2)}
+              tone={stats.avgDailyReturnPct >= 0 ? 'good' : 'critical'}
+            />
+            <StatTile
+              label="Millor / pitjor cistella"
+              value={formatCurrency(stats.bestTrade, { signed: true })}
+              sub={formatCurrency(stats.worstTrade, { signed: true })}
+            />
+            <StatTile
+              label="Mitjana guany / pèrdua"
+              value={formatCurrency(stats.avgWin, { signed: true })}
+              sub={formatCurrency(-stats.avgLoss, { signed: true })}
+            />
+          </div>
+          <DailyPnlChart data={dailyPnl} />
+          <CalendarHeatmap trades={trades} />
         </section>
 
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">

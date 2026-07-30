@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
 import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
+import { floatingSeverityPct } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
 import { StatTile } from './components/StatTile'
 import { EquityCurveChart } from './components/EquityCurveChart'
@@ -184,8 +185,8 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           <StatTile label="Balance" value={formatCurrency(account.balance)} />
           <StatTile
             label="Floating P&L"
-            value={formatCurrency(floatingPnl, { signed: true })}
-            sub={`${openPositions.length} posicions obertes`}
+            value={formatPercent(floatingSeverityPct(floatingPnl, account.balance), 0)}
+            sub={`${formatCurrency(floatingPnl, { signed: true })} · ${openPositions.length} posicions obertes`}
             tone={floatingPnl >= 0 ? 'good' : 'critical'}
           />
           <StatTile
