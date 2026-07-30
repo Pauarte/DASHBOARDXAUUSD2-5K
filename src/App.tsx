@@ -190,8 +190,12 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           />
           <StatTile
             label="Pitjor floating registrat"
-            value={worstFloating ? formatCurrency(worstFloating.value, { signed: true }) : '—'}
-            sub={worstFloating ? formatDateTime(worstFloating.at) : 'Encara sense dades'}
+            value={worstFloating ? formatPercent(worstFloating.pct, 0) : '—'}
+            sub={
+              worstFloating
+                ? `${formatCurrency(worstFloating.value, { signed: true })} · ${formatDateTime(worstFloating.at)}`
+                : 'Encara sense dades'
+            }
             tone="critical"
           />
           <StatTile

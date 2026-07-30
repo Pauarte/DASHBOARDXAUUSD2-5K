@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { groupIntoBaskets, worstFloatingDuringBasket, type FloatingPoint } from '../lib/stats'
 import type { Trade } from '../lib/types'
-import { formatCurrency, formatDateTime } from '../lib/format'
+import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
 
 const directionStyle: Record<Trade['direction'], string> = {
   BUY: 'text-[var(--good-text)] bg-[var(--good)]/10',
@@ -95,12 +95,13 @@ export function TradeHistoryTable({
                     </td>
                     <td
                       className={`py-2 pr-3 text-right tabular ${
-                        worstFloating !== null && worstFloating < 0
+                        worstFloating !== null && worstFloating.pct < 0
                           ? 'text-[var(--critical)]'
                           : 'text-[var(--text-secondary)]'
                       }`}
+                      title={worstFloating !== null ? formatCurrency(worstFloating.value, { signed: true }) : undefined}
                     >
-                      {worstFloating !== null ? formatCurrency(worstFloating, { signed: true }) : '—'}
+                      {worstFloating !== null ? formatPercent(worstFloating.pct, 0) : '—'}
                     </td>
                     <td
                       className={`py-2 text-right tabular font-semibold ${

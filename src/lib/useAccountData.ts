@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient'
 import { mockAccount, mockOpenPositions, mockTrades } from './mockData'
 import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from './types'
 import type { FloatingPoint } from './stats'
+import { floatingSeverityPct } from './floatingRisk'
 
 const ACCOUNT_ID = import.meta.env.VITE_MT5_ACCOUNT || mockAccount.symbol
 const REFRESH_INTERVAL_MS = 30_000
@@ -19,6 +20,7 @@ const ACCOUNT_START_BALANCE = 2496.6
 
 export interface WorstFloating {
   value: number
+  pct: number
   at: string
 }
 
@@ -118,7 +120,7 @@ export function useAccountData(): AccountData {
         // floating_pnl_snapshots may not exist yet on older deployments — tolerate the error.
         supabase!
           .from('floating_pnl_snapshots')
-          .select('floating_pnl, recorded_at')
+          .select('floating_pnl, recorded_at, balance')
           .eq('account', ACCOUNT_ID)
           .order('floating_pnl', { ascending: true })
           .limit(1)
@@ -131,7 +133,7 @@ export function useAccountData(): AccountData {
         // floating reached during each individual closed operation.
         supabase!
           .from('floating_pnl_snapshots')
-          .select('floating_pnl, recorded_at')
+          .select('floating_pnl, recorded_at, balance')
           .eq('account', ACCOUNT_ID)
           .order('recorded_at', { ascending: true })
           .limit(5000)
@@ -201,14 +203,22 @@ export function useAccountData(): AccountData {
         floatingPnl: Number(r.floating_pnl),
       }))
 
-      const worstRow = worstFloatingRes.data as { floating_pnl: string | number; recorded_at: string } | null
+      const worstRow = worstFloatingRes.data as
+        | { floating_pnl: string | number; recorded_at: string; balance: string | number }
+        | null
       const worstFloating: WorstFloating | null = worstRow
-        ? { value: Number(worstRow.floating_pnl), at: worstRow.recorded_at }
+        ? {
+            value: Number(worstRow.floating_pnl),
+            pct: floatingSeverityPct(Number(worstRow.floating_pnl), Number(worstRow.balance)),
+            at: worstRow.recorded_at,
+          }
         : null
 
       const floatingHistory: FloatingPoint[] = (
-        (floatingHistoryRes.data as Array<{ floating_pnl: string | number; recorded_at: string }> | null) ?? []
-      ).map((r) => ({ recordedAt: r.recorded_at, floatingPnl: Number(r.floating_pnl) }))
+        (floatingHistoryRes.data as
+          | Array<{ floating_pnl: string | number; recorded_at: string; balance: string | number }>
+          | null) ?? []
+      ).map((r) => ({ recordedAt: r.recorded_at, floatingPnl: Number(r.floating_pnl), balance: Number(r.balance) }))
 
       const capitalRows = (capitalRes.data as Array<{ type: 'deposit' | 'withdrawal'; amount: string | number }> | null) ?? []
       const totalNetCapital = capitalRows.length

@@ -1,5 +1,6 @@
 import type { Trade } from './types'
 import { dashboardDateKey } from './format'
+import { floatingSeverityPct } from './floatingRisk'
 
 export interface EquityPoint {
   time: string
@@ -31,24 +32,36 @@ const BASKET_CLOSE_GAP_SECONDS = 3
 export interface FloatingPoint {
   recordedAt: string
   floatingPnl: number
+  balance: number
+}
+
+export interface WorstFloatingSeverity {
+  value: number
+  pct: number
 }
 
 // Worst (most negative) account-wide floating P&L recorded while this
 // basket was open — how deep it went underwater before closing. Reads
 // from the whole-account floating history, so if two baskets were ever
 // open at once this would include the other one's contribution too; in
-// practice this bot runs one basket at a time.
-export function worstFloatingDuringBasket(history: FloatingPoint[], basket: Basket): number | null {
+// practice this bot runs one basket at a time. The % is relative to the
+// bot's own balance-scaled close threshold at that same moment (see
+// lib/floatingRisk.ts), so it stays meaningful as the account grows.
+export function worstFloatingDuringBasket(
+  history: FloatingPoint[],
+  basket: Basket,
+): WorstFloatingSeverity | null {
   const openTime = Math.min(...basket.legs.map((l) => new Date(l.openTime).getTime()))
   const closeTime = new Date(basket.closeTime).getTime()
 
-  let worst: number | null = null
+  let worst: FloatingPoint | null = null
   for (const point of history) {
     const t = new Date(point.recordedAt).getTime()
     if (t < openTime || t > closeTime) continue
-    if (worst === null || point.floatingPnl < worst) worst = point.floatingPnl
+    if (worst === null || point.floatingPnl < worst.floatingPnl) worst = point
   }
-  return worst
+  if (!worst) return null
+  return { value: worst.floatingPnl, pct: floatingSeverityPct(worst.floatingPnl, worst.balance) }
 }
 
 export interface AccountStats {
