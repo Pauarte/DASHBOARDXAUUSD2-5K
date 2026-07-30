@@ -18,3 +18,10 @@ npm run lint
 ```
 
 Les variables de Vercel continuen sent `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` i `VITE_MT5_ACCOUNT`.
+
+## Telemetria completa
+
+La captura avançada, les taules privades, l'API protegida i el desplegament
+estan documentats a [`docs/TELEMETRIA_COMPLETA.md`](docs/TELEMETRIA_COMPLETA.md).
+El sincronitzador continua sent estrictament de només lectura i no conté cap
+crida per enviar ordres a MT5.

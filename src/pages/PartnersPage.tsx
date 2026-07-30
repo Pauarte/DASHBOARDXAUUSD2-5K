@@ -88,7 +88,9 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
           .select('recorded_at, balance')
           .order('recorded_at', { ascending: true })
           .range(from, to),
-      ).then((data) => ({ data, error: null as unknown })),
+      )
+        .then((data) => ({ data, error: null as unknown }))
+        .catch((error) => ({ data: null, error })),
     ])
 
     if (contributionsRes.error) {

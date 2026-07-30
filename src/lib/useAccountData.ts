@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured, fetchAllRows } from './supabaseClient'
 import { mockAccount, mockOpenPositions, mockTrades } from './mockData'
-import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from './types'
+import type {
+  AccountSnapshot,
+  Direction,
+  ExitReason,
+  OpenPosition,
+  TechnicalTelemetry,
+  Trade,
+} from './types'
 import type { FloatingPoint } from './stats'
 import { floatingSeverityPct } from './floatingRisk'
 
@@ -38,6 +45,7 @@ interface AccountData {
   syncAgeSeconds: number | null
   lastCheckedAt: string | null
   connectionError: string | null
+  telemetry: TechnicalTelemetry | null
 }
 
 type StoredAccountData = Omit<AccountData, 'isStale' | 'syncAgeSeconds'>
@@ -54,10 +62,12 @@ const FALLBACK: StoredAccountData = {
   lastSyncAt: null,
   lastCheckedAt: null,
   connectionError: null,
+  telemetry: null,
 }
 
 interface TradeRow {
   id: number
+  basket_id?: string | null
   direction: Direction
   lots: string | number
   entry_price: string | number
@@ -66,6 +76,11 @@ interface TradeRow {
   close_time: string
   pnl: string | number
   exit_reason: ExitReason
+  position_id?: number | null
+  gross_profit?: string | number | null
+  commission?: string | number | null
+  swap?: string | number | null
+  fee?: string | number | null
 }
 
 interface OpenPositionRow {
@@ -85,6 +100,84 @@ interface AccountSnapshotRow {
   updated_at: string
 }
 
+interface TelemetrySummaryRow {
+  updated_at: string
+  bot_version_key: string
+  margin_free: string | number
+  margin_level: string | number
+  position_count: number
+  total_lots: string | number
+  drawdown_amount: string | number
+  drawdown_pct: string | number
+  intraday_drawdown_amount: string | number
+  intraday_drawdown_pct: string | number
+  effective_base_lot: string | number
+  effective_max_total_lot: string | number
+  effective_max_floating_loss: string | number
+  floating_limit_used_pct: string | number
+  lot_limit_used_pct: string | number
+  bid: string | number | null
+  ask: string | number | null
+  spread_points: string | number | null
+  atr_m1: string | number | null
+  atr_m5: string | number | null
+  spread_atr_ratio: string | number | null
+  rsi_m1: string | number | null
+  adx_m1: string | number | null
+  recent_move_5m: string | number | null
+  recent_move_15m: string | number | null
+  recent_move_60m: string | number | null
+  news_block_active: boolean
+  news_block_reason: string | null
+  rollover_block_active: boolean
+  day_worst_floating: string | number
+  day_max_floating_limit_used_pct: string | number
+  day_max_spread_points: string | number | null
+  day_max_spread_atr_ratio: string | number | null
+  day_min_margin_level: string | number | null
+  day_worst_intraday_drawdown_pct: string | number
+  sync_duration_ms: number
+}
+
+function optionalNumber(value: string | number | null): number | null {
+  if (value === null) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+async function fetchTrades() {
+  try {
+    const data = await fetchAllRows<TradeRow>((from, to) =>
+      supabase!
+        .from('trades')
+        .select(
+          'id,basket_id,position_id,direction,lots,entry_price,exit_price,open_time,' +
+            'close_time,pnl,gross_profit,commission,swap,fee,exit_reason',
+        )
+        .eq('account', ACCOUNT_ID)
+        .order('close_time', { ascending: true })
+        .returns<TradeRow[]>()
+        .range(from, to),
+    )
+    return { data, error: null }
+  } catch {
+    try {
+      const data = await fetchAllRows<TradeRow>((from, to) =>
+        supabase!
+          .from('trades')
+          .select('id,direction,lots,entry_price,exit_price,open_time,close_time,pnl,exit_reason')
+          .eq('account', ACCOUNT_ID)
+          .order('close_time', { ascending: true })
+          .returns<TradeRow[]>()
+          .range(from, to),
+      )
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
+  }
+}
+
 export function useAccountData(): AccountData {
   const [data, setData] = useState<StoredAccountData>({
     ...FALLBACK,
@@ -102,12 +195,8 @@ export function useAccountData(): AccountData {
     let cancelled = false
 
     async function load() {
-      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes, floatingHistoryRes, capitalRes] = await Promise.all([
-        supabase!
-          .from('trades')
-          .select('id, direction, lots, entry_price, exit_price, open_time, close_time, pnl, exit_reason')
-          .eq('account', ACCOUNT_ID)
-          .order('close_time', { ascending: true }),
+      const [tradesRes, positionsRes, snapshotRes, worstFloatingRes, floatingHistoryRes, capitalRes, telemetryRes] = await Promise.all([
+        fetchTrades(),
         supabase!
           .from('open_positions')
           .select('mt5_ticket, direction, lots, entry_price, current_price, open_time, floating_pnl')
@@ -154,6 +243,24 @@ export function useAccountData(): AccountData {
             (res) => res,
             () => ({ data: null, error: null }),
           ),
+        supabase!
+          .from('telemetry_summary')
+          .select(
+            'updated_at,bot_version_key,margin_free,margin_level,position_count,total_lots,' +
+              'drawdown_amount,drawdown_pct,intraday_drawdown_amount,intraday_drawdown_pct,' +
+              'effective_base_lot,effective_max_total_lot,effective_max_floating_loss,' +
+              'floating_limit_used_pct,lot_limit_used_pct,bid,ask,spread_points,atr_m1,atr_m5,' +
+              'spread_atr_ratio,rsi_m1,adx_m1,recent_move_5m,recent_move_15m,recent_move_60m,' +
+              'news_block_active,news_block_reason,rollover_block_active,day_worst_floating,' +
+              'day_max_floating_limit_used_pct,day_max_spread_points,day_max_spread_atr_ratio,' +
+              'day_min_margin_level,day_worst_intraday_drawdown_pct,sync_duration_ms',
+          )
+          .eq('account', ACCOUNT_ID)
+          .maybeSingle()
+          .then(
+            (res) => res,
+            () => ({ data: null, error: null }),
+          ),
       ])
 
       if (cancelled) return
@@ -182,7 +289,7 @@ export function useAccountData(): AccountData {
         running = Number((running + Number(r.pnl)).toFixed(2))
         return {
           id: String(r.id),
-          basketId: String(r.id),
+          basketId: r.basket_id || String(r.id),
           openTime: r.open_time,
           closeTime: r.close_time,
           direction: r.direction,
@@ -192,6 +299,11 @@ export function useAccountData(): AccountData {
           pnl: Number(r.pnl),
           exitReason: r.exit_reason,
           balanceAfter: running,
+          positionId: r.position_id == null ? null : String(r.position_id),
+          grossProfit: Number(r.gross_profit ?? r.pnl),
+          commission: Number(r.commission ?? 0),
+          swap: Number(r.swap ?? 0),
+          fee: Number(r.fee ?? 0),
         }
       })
 
@@ -226,6 +338,47 @@ export function useAccountData(): AccountData {
       const totalNetCapital = capitalRows.length
         ? capitalRows.reduce((sum, r) => sum + (r.type === 'deposit' ? Number(r.amount) : -Number(r.amount)), 0)
         : ACCOUNT_START_BALANCE
+      const telemetryRow = telemetryRes.data as TelemetrySummaryRow | null
+      const telemetry: TechnicalTelemetry | null = telemetryRow
+        ? {
+            updatedAt: telemetryRow.updated_at,
+            botVersionKey: telemetryRow.bot_version_key,
+            marginFree: Number(telemetryRow.margin_free),
+            marginLevel: Number(telemetryRow.margin_level),
+            positionCount: telemetryRow.position_count,
+            totalLots: Number(telemetryRow.total_lots),
+            drawdownAmount: Number(telemetryRow.drawdown_amount),
+            drawdownPct: Number(telemetryRow.drawdown_pct),
+            intradayDrawdownAmount: Number(telemetryRow.intraday_drawdown_amount),
+            intradayDrawdownPct: Number(telemetryRow.intraday_drawdown_pct),
+            effectiveBaseLot: Number(telemetryRow.effective_base_lot),
+            effectiveMaxTotalLot: Number(telemetryRow.effective_max_total_lot),
+            effectiveMaxFloatingLoss: Number(telemetryRow.effective_max_floating_loss),
+            floatingLimitUsedPct: Number(telemetryRow.floating_limit_used_pct),
+            lotLimitUsedPct: Number(telemetryRow.lot_limit_used_pct),
+            bid: optionalNumber(telemetryRow.bid),
+            ask: optionalNumber(telemetryRow.ask),
+            spreadPoints: optionalNumber(telemetryRow.spread_points),
+            atrM1: optionalNumber(telemetryRow.atr_m1),
+            atrM5: optionalNumber(telemetryRow.atr_m5),
+            spreadAtrRatio: optionalNumber(telemetryRow.spread_atr_ratio),
+            rsiM1: optionalNumber(telemetryRow.rsi_m1),
+            adxM1: optionalNumber(telemetryRow.adx_m1),
+            recentMove5m: optionalNumber(telemetryRow.recent_move_5m),
+            recentMove15m: optionalNumber(telemetryRow.recent_move_15m),
+            recentMove60m: optionalNumber(telemetryRow.recent_move_60m),
+            newsBlockActive: telemetryRow.news_block_active,
+            newsBlockReason: telemetryRow.news_block_reason,
+            rolloverBlockActive: telemetryRow.rollover_block_active,
+            dayWorstFloating: Number(telemetryRow.day_worst_floating),
+            dayMaxFloatingLimitUsedPct: Number(telemetryRow.day_max_floating_limit_used_pct),
+            dayMaxSpreadPoints: optionalNumber(telemetryRow.day_max_spread_points),
+            dayMaxSpreadAtrRatio: optionalNumber(telemetryRow.day_max_spread_atr_ratio),
+            dayMinMarginLevel: optionalNumber(telemetryRow.day_min_margin_level),
+            dayWorstIntradayDrawdownPct: Number(telemetryRow.day_worst_intraday_drawdown_pct),
+            syncDurationMs: telemetryRow.sync_duration_ms,
+          }
+        : null
 
       setData({
         trades,
@@ -245,6 +398,7 @@ export function useAccountData(): AccountData {
         lastSyncAt,
         lastCheckedAt: checkedAt,
         connectionError: null,
+        telemetry,
       })
     }
 
