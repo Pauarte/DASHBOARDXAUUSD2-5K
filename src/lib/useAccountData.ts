@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase, isSupabaseConfigured } from './supabaseClient'
+import { supabase, isSupabaseConfigured, fetchAllRows } from './supabaseClient'
 import { mockAccount, mockOpenPositions, mockTrades } from './mockData'
 import type { AccountSnapshot, Direction, ExitReason, OpenPosition, Trade } from './types'
 import type { FloatingPoint } from './stats'
@@ -130,17 +130,19 @@ export function useAccountData(): AccountData {
             () => ({ data: null, error: null }),
           ),
         // Full history (not just the worst point), used to find the worst
-        // floating reached during each individual closed operation.
-        supabase!
-          .from('floating_pnl_snapshots')
-          .select('floating_pnl, recorded_at, balance')
-          .eq('account', ACCOUNT_ID)
-          .order('recorded_at', { ascending: true })
-          .limit(5000)
-          .then(
-            (res) => res,
-            () => ({ data: null, error: null }),
-          ),
+        // floating reached during each individual closed operation. Paged
+        // via fetchAllRows — a single .limit() silently caps at Supabase's
+        // max-rows (1000) once the table grows past that.
+        fetchAllRows<{ floating_pnl: string | number; recorded_at: string; balance: string | number }>((from, to) =>
+          supabase!
+            .from('floating_pnl_snapshots')
+            .select('floating_pnl, recorded_at, balance')
+            .eq('account', ACCOUNT_ID)
+            .order('recorded_at', { ascending: true })
+            .range(from, to),
+        )
+          .then((data) => ({ data, error: null }))
+          .catch(() => ({ data: null, error: null })),
         // Partner deposits/withdrawals (from /socis) — the real "how much
         // money is currently invested" baseline, which grows/shrinks every
         // time someone adds or takes out capital. Tolerate the table not

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
+import { supabase, isSupabaseConfigured, fetchAllRows } from '../lib/supabaseClient'
 import { useAccountData } from '../lib/useAccountData'
 import {
   computeStakes,
@@ -79,11 +79,16 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
         .from('capital_contributions')
         .select('id, person_name, type, amount, pool_value_before, units_before, units_delta, note, created_at')
         .order('created_at', { ascending: true }),
-      supabase
-        .from('floating_pnl_snapshots')
-        .select('recorded_at, balance')
-        .order('recorded_at', { ascending: true })
-        .limit(5000),
+      // Paged — a single .limit() silently caps at Supabase's max-rows
+      // (1000) once floating_pnl_snapshots grows past that, which was
+      // quietly cutting off the most recent history.
+      fetchAllRows<{ recorded_at: string; balance: string | number }>((from, to) =>
+        supabase!
+          .from('floating_pnl_snapshots')
+          .select('recorded_at, balance')
+          .order('recorded_at', { ascending: true })
+          .range(from, to),
+      ).then((data) => ({ data, error: null as unknown })),
     ])
 
     if (contributionsRes.error) {
