@@ -12,7 +12,6 @@ import {
 } from '../lib/capitalPool'
 import { buildDailyPnl, computeStats } from '../lib/stats'
 import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
-import { floatingSeverityPct } from '../lib/floatingRisk'
 import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
 import { PersonalValueChart } from '../components/PersonalValueChart'
@@ -128,6 +127,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   )
   const myGainLoss = myStake ? myStake.currentValue - myStake.netContributed : 0
   const myTodayChange = myStake ? personTodayChange(myValueHistory, myStake.currentValue) : { pnl: 0, pct: 0 }
+  const myShare = myStake ? myStake.percentage / 100 : 0
   const myFloating = myStake ? (floatingTotal * myStake.percentage) / 100 : 0
 
   async function submit(e: FormEvent) {
@@ -267,19 +267,13 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
           <PersonalValueChart data={myValueHistory} />
 
           <p className="text-xs text-[var(--text-muted)] mt-2">
-            Estadístiques del bot — les mateixes que al dashboard principal, no depenen de qui les mira
+            La teva part de cada mètrica del bot, segons el teu {formatPercent(myStake?.percentage ?? 0, 1)}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatTile
-              label="Floating P&L (bot)"
-              value={formatPercent(floatingSeverityPct(floatingTotal, account.balance), 0)}
-              sub={`${formatCurrency(floatingTotal, { signed: true })} · ${openPositions.length} posicions obertes`}
-              tone={floatingTotal >= 0 ? 'good' : 'critical'}
-            />
-            <StatTile
               label="Pitjor floating registrat"
               value={worstFloating ? formatPercent(worstFloating.pct, 0) : '—'}
-              sub={worstFloating ? formatCurrency(worstFloating.value, { signed: true }) : 'Encara sense dades'}
+              sub={worstFloating ? formatCurrency(worstFloating.value * myShare, { signed: true }) : 'Encara sense dades'}
               tone="critical"
             />
             <StatTile
@@ -295,13 +289,13 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             />
             <StatTile
               label="Millor / pitjor cistella"
-              value={formatCurrency(stats.bestTrade, { signed: true })}
-              sub={formatCurrency(stats.worstTrade, { signed: true })}
+              value={formatCurrency(stats.bestTrade * myShare, { signed: true })}
+              sub={formatCurrency(stats.worstTrade * myShare, { signed: true })}
             />
             <StatTile
               label="Mitjana guany / pèrdua"
-              value={formatCurrency(stats.avgWin, { signed: true })}
-              sub={formatCurrency(-stats.avgLoss, { signed: true })}
+              value={formatCurrency(stats.avgWin * myShare, { signed: true })}
+              sub={formatCurrency(-stats.avgLoss * myShare, { signed: true })}
             />
           </div>
           <DailyPnlChart data={dailyPnl} />
