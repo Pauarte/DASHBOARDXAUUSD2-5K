@@ -160,9 +160,16 @@ export function CalendarHeatmap({ trades, dailyPct }: { trades: Trade[]; dailyPc
                     {Number(cell.date.slice(8, 10))}
                   </span>
                   {cell.trades > 0 && (
-                    <span className="text-[10px] font-semibold tabular text-[var(--text-primary)]">
-                      {cell.pnl >= 0 ? '+' : ''}
-                      {Math.round(cell.pnl)}
+                    <span className="flex flex-col leading-tight">
+                      <span className="text-[10px] font-semibold tabular text-[var(--text-primary)]">
+                        {cell.pnl >= 0 ? '+' : ''}
+                        {Math.round(cell.pnl)}
+                      </span>
+                      {dailyPct && (
+                        <span className="text-[9px] tabular text-[var(--text-muted)]">
+                          {formatPercent(cell.pct, 1)}
+                        </span>
+                      )}
                     </span>
                   )}
                 </button>

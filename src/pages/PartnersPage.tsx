@@ -57,13 +57,17 @@ export function PartnersPage() {
 
 function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
   const { account, isLive, trades, openPositions, worstFloating } = useAccountData()
-  const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
   const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
   const [rows, setRows] = useState<ContributionRow[]>([])
   const [balanceHistory, setBalanceHistory] = useState<{ recordedAt: string; balance: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const stats = useMemo(
+    () => computeStats(trades, account.startBalance, balanceHistory),
+    [trades, account.startBalance, balanceHistory],
+  )
 
   const [personName, setPersonName] = useState(identity.isAdmin ? '' : identity.personName)
   const [type, setType] = useState<ContributionType>('deposit')

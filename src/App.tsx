@@ -69,7 +69,10 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     document.title = hasConnectionAlert ? '[ALERTA] Monitor Bots Trading' : 'Monitor Bots Trading'
   }, [hasConnectionAlert])
 
-  const stats = useMemo(() => computeStats(trades, account.startBalance), [trades, account.startBalance])
+  const stats = useMemo(
+    () => computeStats(trades, account.startBalance, floatingHistory),
+    [trades, account.startBalance, floatingHistory],
+  )
   const floatingPnl = account.equity - account.balance
   // Real trading P&L: balance minus everything partners have ever put in
   // or taken out (from /socis), not the bot's fixed genesis balance — so
@@ -87,8 +90,8 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
   )
   const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
   const dailyPct = useMemo(
-    () => buildDailyReturnPct(trades, account.startBalance),
-    [trades, account.startBalance],
+    () => buildDailyReturnPct(trades, account.startBalance, floatingHistory),
+    [trades, account.startBalance, floatingHistory],
   )
 
   const totalReturnPct = ((account.balance - totalNetCapital) / totalNetCapital) * 100

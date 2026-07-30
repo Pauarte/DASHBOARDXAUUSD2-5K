@@ -157,21 +157,45 @@ export function buildDailyPnl(trades: Trade[]): DailyPnl[] {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+// Real balance recorded (via floating_pnl_snapshots) just before a given
+// day started — includes capital deposits/withdrawals, unlike simulating
+// forward from a fixed genesis balance. Falls back to startBalance for any
+// day before the first snapshot on record.
+function balanceBeforeDay(
+  history: { recordedAt: string; balance: number }[],
+  day: string,
+  fallback: number,
+): number {
+  let result = fallback
+  for (const point of history) {
+    if (dashboardDateKey(point.recordedAt) < day) result = point.balance
+  }
+  return result
+}
+
 // Each day's % return relative to the balance it actually started that day
-// with (not a flat conversion) — same day-by-day walk avgDailyReturnPct
-// uses below, just keyed by date so a calendar can show it per cell.
-export function buildDailyReturnPct(trades: Trade[], startBalance: number): Map<string, number> {
+// with — read from real balance snapshots (so a partner deposit/withdrawal
+// on a previous day is correctly reflected), not simulated purely from
+// trade P&L, which would ignore capital movements and skew every % after one.
+export function buildDailyReturnPct(
+  trades: Trade[],
+  startBalance: number,
+  balanceHistory: { recordedAt: string; balance: number }[] = [],
+): Map<string, number> {
   const daily = buildDailyPnl(trades)
   const pctByDay = new Map<string, number>()
-  let dayStartBalance = startBalance
   for (const day of daily) {
+    const dayStartBalance = balanceBeforeDay(balanceHistory, day.date, startBalance)
     pctByDay.set(day.date, dayStartBalance > 0 ? (day.pnl / dayStartBalance) * 100 : 0)
-    dayStartBalance = Number((dayStartBalance + day.pnl).toFixed(2))
   }
   return pctByDay
 }
 
-export function computeStats(trades: Trade[], startBalance: number): AccountStats {
+export function computeStats(
+  trades: Trade[],
+  startBalance: number,
+  balanceHistory: { recordedAt: string; balance: number }[] = [],
+): AccountStats {
   const baskets = groupIntoBaskets(trades)
   const totalTrades = baskets.length
   const wins = baskets.filter((b) => b.isWin)
@@ -201,16 +225,11 @@ export function computeStats(trades: Trade[], startBalance: number): AccountStat
   const avgWin = wins.length > 0 ? grossProfit / wins.length : 0
   const avgLoss = losses.length > 0 ? grossLoss / losses.length : 0
 
-  // Average of each trading day's return, as a % of that day's starting
-  // balance — not total return divided by day count, so a big early day
-  // doesn't get diluted by the (larger) balance of later days.
-  const daily = buildDailyPnl(trades)
-  let dayStartBalance = startBalance
-  const dailyReturnPcts: number[] = []
-  for (const day of daily) {
-    if (dayStartBalance > 0) dailyReturnPcts.push((day.pnl / dayStartBalance) * 100)
-    dayStartBalance = Number((dayStartBalance + day.pnl).toFixed(2))
-  }
+  // Average of each trading day's return, as a % of that day's actual
+  // starting balance (real snapshot, deposits included) — not total return
+  // divided by day count, so a big early day doesn't get diluted by the
+  // (larger) balance of later days.
+  const dailyReturnPcts = Array.from(buildDailyReturnPct(trades, startBalance, balanceHistory).values())
   const avgDailyReturnPct =
     dailyReturnPcts.length > 0
       ? dailyReturnPcts.reduce((s, p) => s + p, 0) / dailyReturnPcts.length
