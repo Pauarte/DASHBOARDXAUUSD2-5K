@@ -75,6 +75,14 @@ export function personValueOverTime(
   return points
 }
 
+function valueBeforeDay(valueHistory: PersonValuePoint[], day: string): number | null {
+  let result: number | null = null
+  for (const point of valueHistory) {
+    if (dashboardDateKey(point.time) < day) result = point.value
+  }
+  return result
+}
+
 // Today's $ and % change in a person's own value — measured from their
 // value at the start of today (Europe/Madrid), or from their first-ever
 // value point if they joined today (there's no "start of day" before that).
@@ -83,15 +91,27 @@ export function personTodayChange(
   currentValue: number,
 ): { pnl: number; pct: number } {
   const today = dashboardDateKey(new Date().toISOString())
-  let startOfDayValue: number | null = null
-  for (const point of valueHistory) {
-    if (dashboardDateKey(point.time) < today) startOfDayValue = point.value
-  }
-  if (startOfDayValue === null) startOfDayValue = valueHistory[0]?.value ?? currentValue
+  const startOfDayValue = valueBeforeDay(valueHistory, today) ?? valueHistory[0]?.value ?? currentValue
 
   const pnl = currentValue - startOfDayValue
   const pct = startOfDayValue > 0 ? (pnl / startOfDayValue) * 100 : 0
   return { pnl, pct }
+}
+
+// Same idea as personTodayChange but for every day in the person's own
+// (already-scaled) daily P&L — % relative to their own value at the start
+// of that day, not the whole bot's balance. Days before they joined have
+// $0 pnl already, so they correctly show 0%.
+export function personDailyReturnPct(
+  dailyPnl: { date: string; pnl: number }[],
+  valueHistory: PersonValuePoint[],
+): Map<string, number> {
+  const pctByDay = new Map<string, number>()
+  for (const day of dailyPnl) {
+    const startValue = valueBeforeDay(valueHistory, day.date)
+    pctByDay.set(day.date, startValue && startValue > 0 ? (day.pnl / startValue) * 100 : 0)
+  }
+  return pctByDay
 }
 
 // Rescales each trade's pnl to one person's own share, using the ownership

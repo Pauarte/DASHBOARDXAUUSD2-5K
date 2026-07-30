@@ -157,6 +157,20 @@ export function buildDailyPnl(trades: Trade[]): DailyPnl[] {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+// Each day's % return relative to the balance it actually started that day
+// with (not a flat conversion) — same day-by-day walk avgDailyReturnPct
+// uses below, just keyed by date so a calendar can show it per cell.
+export function buildDailyReturnPct(trades: Trade[], startBalance: number): Map<string, number> {
+  const daily = buildDailyPnl(trades)
+  const pctByDay = new Map<string, number>()
+  let dayStartBalance = startBalance
+  for (const day of daily) {
+    pctByDay.set(day.date, dayStartBalance > 0 ? (day.pnl / dayStartBalance) * 100 : 0)
+    dayStartBalance = Number((dayStartBalance + day.pnl).toFixed(2))
+  }
+  return pctByDay
+}
+
 export function computeStats(trades: Trade[], startBalance: number): AccountStats {
   const baskets = groupIntoBaskets(trades)
   const totalTrades = baskets.length

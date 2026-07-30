@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { Trade } from '../lib/types'
 import { groupIntoBaskets } from '../lib/stats'
-import { dashboardDateKey, formatCurrency } from '../lib/format'
+import { dashboardDateKey, formatCurrency, formatPercent } from '../lib/format'
 import { useThemeColors } from '../lib/useThemeColors'
 
 interface DayCell {
   date: string
   pnl: number
+  pct: number
   trades: number
   inMonth: boolean
 }
@@ -24,7 +25,7 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
+export function CalendarHeatmap({ trades, dailyPct }: { trades: Trade[]; dailyPct?: Map<string, number> }) {
   const colors = useThemeColors()
 
   const byDay = useMemo(() => {
@@ -60,6 +61,7 @@ export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
     const cells: DayCell[] = Array.from({ length: firstWeekday }, () => ({
       date: '',
       pnl: 0,
+      pct: 0,
       trades: 0,
       inMonth: false,
     }))
@@ -67,16 +69,22 @@ export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
     for (let day = 1; day <= daysInMonth; day++) {
       const key = toKey(new Date(Date.UTC(year, month, day)))
       const entry = byDay.get(key)
-      cells.push({ date: key, pnl: entry?.pnl ?? 0, trades: entry?.trades ?? 0, inMonth: true })
+      cells.push({
+        date: key,
+        pnl: entry?.pnl ?? 0,
+        pct: dailyPct?.get(key) ?? 0,
+        trades: entry?.trades ?? 0,
+        inMonth: true,
+      })
     }
     while (cells.length % 7 !== 0) {
-      cells.push({ date: '', pnl: 0, trades: 0, inMonth: false })
+      cells.push({ date: '', pnl: 0, pct: 0, trades: 0, inMonth: false })
     }
 
     const rows: DayCell[][] = []
     for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7))
     return rows
-  }, [year, month, byDay])
+  }, [year, month, byDay, dailyPct])
 
   const maxAbsPnl = Math.max(1, ...Array.from(byDay.values()).map((v) => Math.abs(v.pnl)))
   const monthLabel = cursor.toLocaleDateString('ca-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
@@ -183,6 +191,12 @@ export function CalendarHeatmap({ trades }: { trades: Trade[] }) {
               }`}
             >
               {formatCurrency(detail.pnl, { signed: true })}
+              {dailyPct && (
+                <span className="text-[var(--text-muted)] font-normal">
+                  {' · '}
+                  {formatPercent(dailyPct.get(detail.date) ?? 0, 2)}
+                </span>
+              )}
             </span>
           </>
         ) : (

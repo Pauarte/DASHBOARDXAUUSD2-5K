@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured, fetchAllRows } from '../lib/supabaseCli
 import { useAccountData } from '../lib/useAccountData'
 import {
   computeStakes,
+  personDailyReturnPct,
   personTodayChange,
   personValueOverTime,
   scaleTradesForPerson,
@@ -134,6 +135,10 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
     [trades, rows, identity.personName],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(myTrades), [myTrades])
+  const myDailyPct = useMemo(
+    () => personDailyReturnPct(dailyPnl, myValueHistory),
+    [dailyPnl, myValueHistory],
+  )
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -304,7 +309,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             />
           </div>
           <DailyPnlChart data={dailyPnl} />
-          <CalendarHeatmap trades={myTrades} />
+          <CalendarHeatmap trades={myTrades} dailyPct={myDailyPct} />
         </section>
 
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">

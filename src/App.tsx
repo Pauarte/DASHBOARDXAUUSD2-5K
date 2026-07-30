@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
+import { buildDailyPnl, buildDailyReturnPct, buildEquityCurve, computeStats } from './lib/stats'
 import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
 import { floatingSeverityPct } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
@@ -86,6 +86,10 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     [trades, account.startBalance, capitalAdjustedBalance, lastSyncAt],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
+  const dailyPct = useMemo(
+    () => buildDailyReturnPct(trades, account.startBalance),
+    [trades, account.startBalance],
+  )
 
   const totalReturnPct = ((account.balance - totalNetCapital) / totalNetCapital) * 100
 
@@ -241,7 +245,7 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
 
         <DailyPnlChart data={dailyPnl} />
 
-        <CalendarHeatmap trades={trades} />
+        <CalendarHeatmap trades={trades} dailyPct={dailyPct} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
