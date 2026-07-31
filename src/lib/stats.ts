@@ -29,6 +29,11 @@ export interface Basket {
 
 const BASKET_CLOSE_GAP_SECONDS = 3
 
+// A basket that closes within this % of balance (either direction) is
+// almost certainly just swap fees eating a flat position, not a real win
+// or loss — counted as break-even instead of padding/hurting win rate.
+const BASKET_BREAKEVEN_PCT = 0.12
+
 export interface FloatingPoint {
   recordedAt: string
   floatingPnl: number
@@ -100,7 +105,10 @@ export function groupIntoBaskets(trades: Trade[]): Basket[] {
   return groups.map((legs) => {
     const pnl = Number(legs.reduce((s, t) => s + t.pnl, 0).toFixed(2))
     const closeTime = legs[legs.length - 1].closeTime
-    return { closeTime, legs, pnl, isWin: pnl > 0, isLoss: pnl < 0 }
+    const balanceBefore = legs[legs.length - 1].balanceAfter - pnl
+    const pnlPct = balanceBefore > 0 ? (pnl / balanceBefore) * 100 : 0
+    const isBreakEven = Math.abs(pnlPct) <= BASKET_BREAKEVEN_PCT
+    return { closeTime, legs, pnl, isWin: !isBreakEven && pnl > 0, isLoss: !isBreakEven && pnl < 0 }
   })
 }
 
