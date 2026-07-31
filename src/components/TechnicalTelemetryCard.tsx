@@ -1,5 +1,6 @@
 import type { TechnicalTelemetry } from '../lib/types'
-import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
+import { formatDateTime, formatPercent } from '../lib/format'
+import { useCurrencyFormatter } from '../lib/currency'
 
 function number(value: number | null, decimals = 2): string {
   return value === null ? '—' : value.toFixed(decimals)
@@ -15,6 +16,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 export function TechnicalTelemetryCard({ telemetry }: { telemetry: TechnicalTelemetry | null }) {
+  const formatCurrency = useCurrencyFormatter()
   return (
     <details className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <summary className="cursor-pointer select-none text-sm font-semibold text-[var(--text-primary)]">
