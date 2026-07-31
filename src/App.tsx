@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildDailyReturnPct, buildEquityCurve, computeStats } from './lib/stats'
-import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
+import { formatDateTime, formatPercent } from './lib/format'
+import { useCurrencyFormatter } from './lib/currency'
+import { CurrencyToggle } from './components/CurrencyToggle'
 import { floatingSeverityPct } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
 import { StatTile } from './components/StatTile'
@@ -24,6 +26,7 @@ function App() {
 }
 
 function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
+  const formatCurrency = useCurrencyFormatter()
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   useEffect(() => {
     const handler = (event: Event) => {
@@ -135,16 +138,19 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
                   : 'Esperant que el sincronitzador publiqui dades reals'}
             </p>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-[var(--text-muted)] uppercase tracking-wide">Account equity</div>
-            <div className="tabular text-3xl font-semibold">{formatCurrency(account.equity)}</div>
-            <div
-              className={`text-xs font-medium ${
-                totalReturnPct >= 0 ? 'text-[var(--good-text)]' : 'text-[var(--critical)]'
-              }`}
-            >
-              {formatPercent(totalReturnPct, 1)} since {formatCurrency(totalNetCapital)} invested
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-xs text-[var(--text-muted)] uppercase tracking-wide">Account equity</div>
+              <div className="tabular text-3xl font-semibold">{formatCurrency(account.equity)}</div>
+              <div
+                className={`text-xs font-medium ${
+                  totalReturnPct >= 0 ? 'text-[var(--good-text)]' : 'text-[var(--critical)]'
+                }`}
+              >
+                {formatPercent(totalReturnPct, 1)} since {formatCurrency(totalNetCapital)} invested
+              </div>
             </div>
+            <CurrencyToggle />
           </div>
         </div>
       </header>

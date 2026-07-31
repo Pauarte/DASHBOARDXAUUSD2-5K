@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { Trade } from '../lib/types'
 import { groupIntoBaskets } from '../lib/stats'
-import { dashboardDateKey, formatCurrency, formatPercent } from '../lib/format'
+import { dashboardDateKey, formatPercent } from '../lib/format'
+import { useCurrencyFormatter } from '../lib/currency'
 import { useThemeColors } from '../lib/useThemeColors'
 
 interface DayCell {
@@ -27,6 +28,7 @@ function hexToRgba(hex: string, alpha: number): string {
 
 export function CalendarHeatmap({ trades, dailyPct }: { trades: Trade[]; dailyPct?: Map<string, number> }) {
   const colors = useThemeColors()
+  const formatCurrency = useCurrencyFormatter()
 
   const byDay = useMemo(() => {
     const map = new Map<string, { pnl: number; trades: number }>()
