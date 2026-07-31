@@ -73,6 +73,10 @@ SELF_PATH = os.path.abspath(__file__)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 advanced_telemetry_available: bool | None = None
+
+
+def response_data(response: Any, default: Any = None) -> Any:
+    return getattr(response, "data", None) if response is not None else default
 first_history_pass = True
 
 
@@ -737,7 +741,7 @@ def closed_pnl_today(now: datetime.datetime) -> float:
         .lt("close_time", end)
         .execute()
     )
-    return sum(finite(row["pnl"]) for row in (response.data or []))
+    return sum(finite(row["pnl"]) for row in (response_data(response, []) or []))
 
 
 def historical_risk_baselines(now: datetime.datetime, balance: float, equity: float, day_pnl: float) -> dict[str, float]:
@@ -749,7 +753,8 @@ def historical_risk_baselines(now: datetime.datetime, balance: float, equity: fl
         .limit(1)
         .execute()
     )
-    historical_peak = finite(peak_response.data[0]["equity"]) if peak_response.data else equity
+    peak_data = response_data(peak_response, []) or []
+    historical_peak = finite(peak_data[0]["equity"]) if peak_data else equity
     equity_peak = max(equity, historical_peak)
     day_start, _ = madrid_day_bounds(now)
     day_response = (
@@ -771,14 +776,14 @@ def historical_risk_baselines(now: datetime.datetime, balance: float, equity: fl
         .execute()
     )
     day_start_balance = (
-        finite(day_response.data[0]["balance"])
-        if day_response.data
+        finite((response_data(day_response, []) or [])[0]["balance"])
+        if response_data(day_response, [])
         else balance - day_pnl
     )
     day_peak_equity = max(
         equity,
-        finite(day_peak_response.data[0]["equity"])
-        if day_peak_response.data
+        finite((response_data(day_peak_response, []) or [])[0]["equity"])
+        if response_data(day_peak_response, [])
         else equity,
         day_start_balance,
     )
@@ -1088,7 +1093,7 @@ def sync_advanced_telemetry(
         .maybe_single()
         .execute()
     )
-    previous = previous_summary_response.data or {}
+    previous = response_data(previous_summary_response, {}) or {}
     same_day = previous.get("summary_date") == summary_date
 
     def previous_number(name: str, fallback: float) -> float:
@@ -1258,7 +1263,7 @@ def record_risk_probe() -> None:
         .maybe_single()
         .execute()
     )
-    existing = existing_response.data or {}
+    existing = response_data(existing_response, {}) or {}
     today = now.astimezone(MADRID_TZ).date().isoformat()
     if existing.get("summary_date") == today:
         supabase.table("telemetry_summary").update(
