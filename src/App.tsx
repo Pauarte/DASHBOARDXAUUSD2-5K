@@ -12,7 +12,6 @@ import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
 import { ConnectionStatus } from './components/ConnectionStatus'
-import { TechnicalTelemetryCard } from './components/TechnicalTelemetryCard'
 import { useConnectionAlerts } from './lib/useConnectionAlerts'
 import { PasswordGate } from './components/PasswordGate'
 import type { PartnerIdentity } from './lib/partnersAuth'
@@ -57,7 +56,6 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     syncAgeSeconds,
     lastCheckedAt,
     connectionError,
-    telemetry,
   } = useAccountData()
   const hasConnectionAlert = isLive && (isStale || Boolean(connectionError))
   const connectionAlertBody = connectionError
@@ -250,31 +248,7 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
             }
             tone={accountTotalPnl >= 0 ? 'good' : 'critical'}
           />
-          <StatTile
-            label="Drawdown global"
-            value={telemetry ? formatPercent(telemetry.drawdownPct, 2) : '—'}
-            sub={telemetry ? formatCurrency(telemetry.drawdownAmount, { signed: true }) : 'Pendent de telemetria'}
-            tone={telemetry && telemetry.drawdownPct < 0 ? 'critical' : 'good'}
-          />
-          <StatTile
-            label="Drawdown intradia"
-            value={telemetry ? formatPercent(telemetry.intradayDrawdownPct, 2) : '—'}
-            sub={telemetry ? formatCurrency(telemetry.intradayDrawdownAmount, { signed: true }) : 'Pendent de telemetria'}
-            tone={telemetry && telemetry.intradayDrawdownPct < 0 ? 'critical' : 'good'}
-          />
-          <StatTile
-            label="Spread / ATR"
-            value={telemetry?.spreadAtrRatio !== null && telemetry?.spreadAtrRatio !== undefined
-              ? telemetry.spreadAtrRatio.toFixed(3)
-              : '—'}
-            sub={telemetry?.spreadPoints !== null && telemetry?.spreadPoints !== undefined
-              ? `${telemetry.spreadPoints.toFixed(1)} punts`
-              : 'Pendent de telemetria'}
-            tone={telemetry && telemetry.spreadAtrRatio !== null && telemetry.spreadAtrRatio > 0.12 ? 'critical' : 'neutral'}
-          />
         </section>
-
-        <TechnicalTelemetryCard telemetry={telemetry} />
 
         <EquityCurveChart data={equityCurve} />
 

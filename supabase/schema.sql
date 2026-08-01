@@ -1,7 +1,5 @@
 -- Run this once in the Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/dkfnbamheyghbzppwxki/sql/new
--- Després, per activar l'auditoria privada completa, executar també:
--- supabase/migrations/20260730_full_private_telemetry.sql
 
 create table if not exists trades (
   id bigint generated always as identity primary key,

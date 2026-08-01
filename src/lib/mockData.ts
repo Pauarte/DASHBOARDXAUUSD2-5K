@@ -109,11 +109,6 @@ function generateTrades(basketCount: number): Trade[] {
         pnl: legPnl,
         exitReason,
         balanceAfter: balance,
-        positionId: `mock-${basketId}-${i + 1}`,
-        grossProfit: legPnl,
-        commission: 0,
-        swap: 0,
-        fee: 0,
       })
     }
 

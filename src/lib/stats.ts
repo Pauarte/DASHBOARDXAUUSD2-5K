@@ -91,39 +91,19 @@ export interface AccountStats {
 
 export function groupIntoBaskets(trades: Trade[]): Basket[] {
   const sorted = [...trades].sort((a, b) => a.closeTime.localeCompare(b.closeTime))
-  const explicitGroups: Trade[][] = []
-  const fallbackGroups: Trade[][] = []
-  const byExplicitId = new Map<string, Trade[]>()
 
+  const groups: Trade[][] = []
   for (const trade of sorted) {
-    if (trade.basketId && trade.basketId !== trade.id) {
-      const explicit = byExplicitId.get(trade.basketId)
-      // The bot has been seen reusing a just-closed basket's id for the very
-      // next basket it opens in the opposite direction — treat a direction
-      // change as the start of a new basket even when the id matches.
-      if (explicit && explicit[explicit.length - 1].direction === trade.direction) {
-        explicit.push(trade)
-      } else {
-        const group = [trade]
-        byExplicitId.set(trade.basketId, group)
-        explicitGroups.push(group)
-      }
-      continue
-    }
-    const current = fallbackGroups[fallbackGroups.length - 1]
+    const current = groups[groups.length - 1]
     const prevTime = current ? new Date(current[current.length - 1].closeTime).getTime() : null
     const gapSeconds = prevTime !== null ? (new Date(trade.closeTime).getTime() - prevTime) / 1000 : Infinity
 
     if (current && gapSeconds <= BASKET_CLOSE_GAP_SECONDS) {
       current.push(trade)
     } else {
-      fallbackGroups.push([trade])
+      groups.push([trade])
     }
   }
-
-  const groups = [...explicitGroups, ...fallbackGroups].sort((a, b) =>
-    a[a.length - 1].closeTime.localeCompare(b[b.length - 1].closeTime),
-  )
 
   return groups.map((legs) => {
     const pnl = Number(legs.reduce((s, t) => s + t.pnl, 0).toFixed(2))

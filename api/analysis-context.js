@@ -3,13 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 const STALE_AFTER_SECONDS = 180
 const BASKET_CLOSE_GAP_SECONDS = 3
 const MADRID_TIMEZONE = 'Europe/Madrid'
-const DEFAULT_NET_CAPITAL = Number(process.env.ACCOUNT_START_BALANCE ?? 2496.6)
-
-function numericOrNull(value) {
-  if (value === null || value === undefined || value === '') return null
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
 
 function madridDateKey(value) {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -22,75 +15,24 @@ function madridDateKey(value) {
 
 function groupIntoOperations(rows) {
   const sorted = [...rows].sort((a, b) => String(a.close_time).localeCompare(String(b.close_time)))
-  const explicitGroups = []
-  const fallbackGroups = []
-  const explicitById = new Map()
+  const groups = []
 
   for (const trade of sorted) {
-    if (trade.basket_id) {
-      const existing = explicitById.get(trade.basket_id)
-      if (existing) existing.push(trade)
-      else {
-        const group = [trade]
-        explicitById.set(trade.basket_id, group)
-        explicitGroups.push(group)
-      }
-      continue
-    }
-    const current = fallbackGroups[fallbackGroups.length - 1]
+    const current = groups[groups.length - 1]
     const previous = current?.[current.length - 1]
     const gap = previous
       ? (Date.parse(trade.close_time) - Date.parse(previous.close_time)) / 1000
       : Number.POSITIVE_INFINITY
 
     if (current && gap <= BASKET_CLOSE_GAP_SECONDS) current.push(trade)
-    else fallbackGroups.push([trade])
+    else groups.push([trade])
   }
 
-  const groups = [...explicitGroups, ...fallbackGroups].sort((a, b) =>
-    String(a[a.length - 1].close_time).localeCompare(String(b[b.length - 1].close_time)),
-  )
-
   return groups.map((legs) => ({
-    basket_id: legs[0].basket_id ?? null,
-    open_time: legs.reduce(
-      (earliest, leg) => (String(leg.open_time) < earliest ? String(leg.open_time) : earliest),
-      String(legs[0].open_time),
-    ),
     close_time: legs[legs.length - 1].close_time,
     pnl: Number(legs.reduce((sum, leg) => sum + Number(leg.pnl), 0).toFixed(2)),
-    gross_profit: Number(
-      legs.reduce((sum, leg) => sum + Number(leg.gross_profit ?? leg.pnl), 0).toFixed(2),
-    ),
-    commission: Number(
-      legs.reduce((sum, leg) => sum + Number(leg.commission ?? 0), 0).toFixed(2),
-    ),
-    swap: Number(legs.reduce((sum, leg) => sum + Number(leg.swap ?? 0), 0).toFixed(2)),
-    fee: Number(legs.reduce((sum, leg) => sum + Number(leg.fee ?? 0), 0).toFixed(2)),
-    lots: Number(legs.reduce((sum, leg) => sum + Number(leg.lots), 0).toFixed(2)),
     legs: legs.length,
   }))
-}
-
-async function fetchTrades(supabase, accountId, historyFrom) {
-  const extended = await supabase
-    .from('trades')
-    .select(
-      'basket_id,direction,lots,open_time,close_time,pnl,gross_profit,' +
-        'commission,swap,fee,exit_reason',
-    )
-    .eq('account', accountId)
-    .gte('close_time', historyFrom)
-    .order('close_time', { ascending: true })
-
-  if (!extended.error) return extended
-
-  return supabase
-    .from('trades')
-    .select('direction,lots,open_time,close_time,pnl,exit_reason')
-    .eq('account', accountId)
-    .gte('close_time', historyFrom)
-    .order('close_time', { ascending: true })
 }
 
 export default async function handler(_request, response) {
@@ -113,7 +55,7 @@ export default async function handler(_request, response) {
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
     const historyFrom = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
 
-    const [snapshotResult, positionsResult, tradesResult, floatingResult, capitalResult, telemetryResult] = await Promise.all([
+    const [snapshotResult, positionsResult, tradesResult, floatingResult, capitalResult] = await Promise.all([
       supabase
         .from('account_snapshots')
         .select('balance, equity, currency, updated_at')
@@ -123,7 +65,12 @@ export default async function handler(_request, response) {
         .from('open_positions')
         .select('direction, lots, entry_price, current_price, open_time, floating_pnl')
         .eq('account', accountId),
-      fetchTrades(supabase, accountId, historyFrom),
+      supabase
+        .from('trades')
+        .select('direction, lots, open_time, close_time, pnl, exit_reason')
+        .eq('account', accountId)
+        .gte('close_time', historyFrom)
+        .order('close_time', { ascending: true }),
       supabase
         .from('floating_pnl_snapshots')
         .select('floating_pnl, recorded_at')
@@ -131,25 +78,6 @@ export default async function handler(_request, response) {
         .gte('recorded_at', historyFrom)
         .order('recorded_at', { ascending: true }),
       supabase.from('capital_contributions').select('type, amount'),
-      supabase
-        .from('telemetry_summary')
-        .select(
-          'updated_at,bot_version_key,balance,equity,floating_pnl,margin_free,margin_level,' +
-          'position_count,total_lots,drawdown_amount,drawdown_pct,intraday_drawdown_amount,' +
-          'intraday_drawdown_pct,effective_base_lot,effective_max_total_lot,' +
-          'effective_max_floating_loss,floating_limit_used_pct,lot_limit_used_pct,bid,ask,' +
-          'spread_points,atr_m1,atr_m5,spread_atr_ratio,rsi_m1,adx_m1,recent_move_5m,' +
-          'recent_move_15m,recent_move_60m,news_block_active,news_block_reason,' +
-          'rollover_block_active,day_worst_floating,day_max_floating_limit_used_pct,' +
-          'day_max_spread_points,day_max_spread_atr_ratio,day_min_margin_level,' +
-          'day_worst_intraday_drawdown_pct,sync_duration_ms',
-        )
-        .eq('account', accountId)
-        .maybeSingle()
-        .then(
-          (result) => result,
-          () => ({ data: null, error: null }),
-        ),
     ])
 
     const criticalError = snapshotResult.error ?? positionsResult.error ?? tradesResult.error
@@ -177,13 +105,10 @@ export default async function handler(_request, response) {
       .filter((point) => madridDateKey(point.recorded_at) === today)
       .map((point) => Number(point.floating_pnl))
     const capitalRows = capitalResult.data ?? []
-    const netCapital = capitalRows.length
-      ? capitalRows.reduce(
-          (sum, row) => sum + (row.type === 'deposit' ? Number(row.amount) : -Number(row.amount)),
-          0,
-        )
-      : DEFAULT_NET_CAPITAL
-    const telemetry = telemetryResult.data
+    const netCapital = capitalRows.reduce(
+      (sum, row) => sum + (row.type === 'deposit' ? Number(row.amount) : -Number(row.amount)),
+      0,
+    )
 
     return response.status(200).json({
       ok: true,
@@ -216,58 +141,9 @@ export default async function handler(_request, response) {
       live: {
         open_positions: positions.length,
         floating_pnl: floatingPnl,
-        total_lots: telemetry ? Number(telemetry.total_lots) : null,
-        margin_free: telemetry ? Number(telemetry.margin_free) : null,
-        margin_level: telemetry ? Number(telemetry.margin_level) : null,
-        effective_base_lot: telemetry ? Number(telemetry.effective_base_lot) : null,
-        effective_max_total_lot: telemetry ? Number(telemetry.effective_max_total_lot) : null,
-        effective_max_floating_loss: telemetry ? Number(telemetry.effective_max_floating_loss) : null,
-        floating_limit_used_pct: telemetry ? Number(telemetry.floating_limit_used_pct) : null,
-        lot_limit_used_pct: telemetry ? Number(telemetry.lot_limit_used_pct) : null,
       },
-      risk: telemetry
-        ? {
-            global_drawdown: Number(telemetry.drawdown_amount),
-            global_drawdown_pct: Number(telemetry.drawdown_pct),
-            intraday_drawdown: Number(telemetry.intraday_drawdown_amount),
-            intraday_drawdown_pct: Number(telemetry.intraday_drawdown_pct),
-            day_worst_floating: Number(telemetry.day_worst_floating),
-            day_max_floating_limit_used_pct: Number(telemetry.day_max_floating_limit_used_pct),
-            day_worst_intraday_drawdown_pct: Number(telemetry.day_worst_intraday_drawdown_pct),
-          }
-        : null,
-      market: telemetry
-        ? {
-            bid: numericOrNull(telemetry.bid),
-            ask: numericOrNull(telemetry.ask),
-            spread_points: numericOrNull(telemetry.spread_points),
-            atr_m1: numericOrNull(telemetry.atr_m1),
-            atr_m5: numericOrNull(telemetry.atr_m5),
-            spread_atr_ratio: numericOrNull(telemetry.spread_atr_ratio),
-            rsi_m1: numericOrNull(telemetry.rsi_m1),
-            adx_m1: numericOrNull(telemetry.adx_m1),
-            recent_move_5m: numericOrNull(telemetry.recent_move_5m),
-            recent_move_15m: numericOrNull(telemetry.recent_move_15m),
-            recent_move_60m: numericOrNull(telemetry.recent_move_60m),
-            day_max_spread_points: numericOrNull(telemetry.day_max_spread_points),
-            day_max_spread_atr_ratio: numericOrNull(telemetry.day_max_spread_atr_ratio),
-          }
-        : null,
-      guards: telemetry
-        ? {
-            news_block_active: Boolean(telemetry.news_block_active),
-            news_block_reason: telemetry.news_block_reason,
-            rollover_block_active: Boolean(telemetry.rollover_block_active),
-          }
-        : null,
-      telemetry: telemetry
-        ? {
-            version_key: telemetry.bot_version_key,
-            sync_duration_ms: Number(telemetry.sync_duration_ms),
-          }
-        : null,
       recent_operations: operations.slice(-10),
-      unavailable_metrics: telemetry ? [] : ['spread', 'market_context', 'risk_limits'],
+      unavailable_metrics: ['spread'],
     })
   } catch (error) {
     return response.status(500).json({
