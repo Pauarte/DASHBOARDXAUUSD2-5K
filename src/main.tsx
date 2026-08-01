@@ -4,7 +4,6 @@ import './index.css'
 import App from './App.tsx'
 import { PartnersPage } from './pages/PartnersPage.tsx'
 import { AnalysisPage } from './pages/AnalysisPage.tsx'
-import { CurrencyProvider } from './lib/currency.tsx'
 
 // No router library — this is the only secondary route, kept as a plain
 // pathname check so /socis stays out of the public dashboard's nav/bundle
@@ -18,9 +17,7 @@ const Root =
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <CurrencyProvider>
-      <Root />
-    </CurrencyProvider>
+    <Root />
   </StrictMode>,
 )
 

@@ -1,13 +1,11 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { PersonValuePoint } from '../lib/capitalPool'
-import { formatDateTime } from '../lib/format'
-import { useCurrencyFormatter } from '../lib/currency'
+import { formatCurrency, formatDateTime } from '../lib/format'
 import { ChartTooltip } from './ChartTooltip'
 import { useThemeColors } from '../lib/useThemeColors'
 
 export function PersonalValueChart({ data }: { data: PersonValuePoint[] }) {
   const colors = useThemeColors()
-  const formatCurrency = useCurrencyFormatter()
 
   if (data.length < 2) {
     return (

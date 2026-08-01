@@ -1,13 +1,11 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { DailyPnl } from '../lib/stats'
-import { formatDate } from '../lib/format'
-import { useCurrencyFormatter } from '../lib/currency'
+import { formatCurrency, formatDate } from '../lib/format'
 import { ChartTooltip } from './ChartTooltip'
 import { useThemeColors } from '../lib/useThemeColors'
 
 export function DailyPnlChart({ data }: { data: DailyPnl[] }) {
   const colors = useThemeColors()
-  const formatCurrency = useCurrencyFormatter()
   const recent = data.slice(-30)
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">

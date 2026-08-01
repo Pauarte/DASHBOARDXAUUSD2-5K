@@ -1,5 +1,15 @@
 export const DASHBOARD_TIME_ZONE = 'Europe/Madrid'
 
+export function formatCurrency(value: number, opts: { signed?: boolean } = {}): string {
+  const sign = opts.signed && value > 0 ? '+' : ''
+  return `${sign}${value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
 export function formatPercent(value: number, digits = 1): string {
   return `${value.toFixed(digits)}%`
 }

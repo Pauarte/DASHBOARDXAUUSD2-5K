@@ -13,15 +13,13 @@ import {
   type PersonStake,
 } from '../lib/capitalPool'
 import { buildDailyPnl, computeStats } from '../lib/stats'
-import { formatDateTime, formatPercent } from '../lib/format'
-import { useCurrencyFormatter } from '../lib/currency'
+import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
 import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
 import { PersonalValueChart } from '../components/PersonalValueChart'
 import { PasswordGate } from '../components/PasswordGate'
 import { DailyPnlChart } from '../components/DailyPnlChart'
 import { CalendarHeatmap } from '../components/CalendarHeatmap'
-import { CurrencyToggle } from '../components/CurrencyToggle'
 
 interface ContributionDbRow {
   id: number
@@ -58,7 +56,6 @@ export function PartnersPage() {
 }
 
 function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
-  const formatCurrency = useCurrencyFormatter()
   const { account, isLive, trades, openPositions, worstFloating } = useAccountData()
   const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
@@ -222,7 +219,6 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CurrencyToggle />
             <button
               type="button"
               onClick={onLogout}

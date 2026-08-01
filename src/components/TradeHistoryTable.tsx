@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { groupIntoBaskets, worstFloatingDuringBasket, type FloatingPoint } from '../lib/stats'
 import type { Trade } from '../lib/types'
-import { formatDateTime, formatPercent } from '../lib/format'
-import { useCurrencyFormatter } from '../lib/currency'
+import { formatCurrency, formatDateTime, formatPercent } from '../lib/format'
 
 const directionStyle: Record<Trade['direction'], string> = {
   BUY: 'text-[var(--good-text)] bg-[var(--good)]/10',
@@ -16,7 +15,6 @@ export function TradeHistoryTable({
   trades: Trade[]
   floatingHistory: FloatingPoint[]
 }) {
-  const formatCurrency = useCurrencyFormatter()
   const baskets = [...groupIntoBaskets(trades)].reverse().slice(0, 20)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
