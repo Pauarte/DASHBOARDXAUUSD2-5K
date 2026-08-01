@@ -60,6 +60,18 @@ def log(message: str) -> None:
     print(f"[{utc_now().isoformat(timespec='seconds')}] {message}", flush=True)
 
 
+_last_good_offset_seconds = 0
+
+# Ticks older than this are treated as stale (market closed for the weekend,
+# terminal disconnected, etc.) rather than a fresh reading of the server
+# clock — using time.time() minus a Friday-evening tick as if it were live
+# would make the computed offset drift further and further off as the
+# closure goes on, corrupting close_time for every trade re-synced (all 30
+# days' worth, every pass) with a worse and worse offset the longer the
+# market stays shut.
+TICK_STALE_AFTER_SECONDS = 300
+
+
 def server_utc_offset_seconds() -> float:
     """
     MT5 deal/position 'time' fields are Unix epoch numbers computed from the
@@ -69,12 +81,24 @@ def server_utc_offset_seconds() -> float:
     every timestamp in the dashboard wrong. Measure the live offset between
     the server's current tick time and this machine's true UTC clock, and
     round to the nearest hour since broker offsets are always whole hours.
+
+    Only trust that measurement when the tick is fresh. A stale tick (no new
+    price since the market closed) stays frozen while the real clock keeps
+    moving, so the raw offset would balloon into nonsense the longer the
+    closure lasts — fall back to the last offset measured while the market
+    was actually live instead of recomputing garbage from a dead tick.
     """
+    global _last_good_offset_seconds
+
     tick = mt5.symbol_info_tick(SYMBOL_FILTER)
-    if tick is None or not tick.time:
-        return 0
-    raw_offset = tick.time - time.time()
-    return round(raw_offset / 3600) * 3600
+    now = time.time()
+    if tick is None or not tick.time or (now - tick.time) > TICK_STALE_AFTER_SECONDS:
+        return _last_good_offset_seconds
+
+    raw_offset = tick.time - now
+    offset = round(raw_offset / 3600) * 3600
+    _last_good_offset_seconds = offset
+    return offset
 
 
 def to_utc_iso(epoch_seconds: float, offset_seconds: float) -> str:
