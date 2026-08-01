@@ -98,8 +98,12 @@ export function groupIntoBaskets(trades: Trade[]): Basket[] {
   for (const trade of sorted) {
     if (trade.basketId && trade.basketId !== trade.id) {
       const explicit = byExplicitId.get(trade.basketId)
-      if (explicit) explicit.push(trade)
-      else {
+      // The bot has been seen reusing a just-closed basket's id for the very
+      // next basket it opens in the opposite direction — treat a direction
+      // change as the start of a new basket even when the id matches.
+      if (explicit && explicit[explicit.length - 1].direction === trade.direction) {
+        explicit.push(trade)
+      } else {
         const group = [trade]
         byExplicitId.set(trade.basketId, group)
         explicitGroups.push(group)
