@@ -96,6 +96,17 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
 
   const totalReturnPct = ((account.balance - totalNetCapital) / totalNetCapital) * 100
 
+  if (loading && !lastSyncAt) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--surface-2)]">
+        <div className="text-center text-sm text-[var(--text-muted)]">
+          <div className="mb-3 h-8 w-8 mx-auto rounded-full border-2 border-[var(--border)] border-t-transparent animate-spin" />
+          Carregant dades reals del bot…
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[var(--surface-2)]">
       <header className="border-b border-[var(--border)] bg-[var(--surface-card)]">

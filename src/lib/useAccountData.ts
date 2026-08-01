@@ -42,12 +42,33 @@ interface AccountData {
 
 type StoredAccountData = Omit<AccountData, 'isStale' | 'syncAgeSeconds'>
 
-const FALLBACK: StoredAccountData = {
+// Used only when Supabase isn't configured at all (pure local demo mode) —
+// never shown while a real fetch is in flight, otherwise these made-up
+// numbers flash on screen looking like real account data before the actual
+// response arrives.
+const DEMO_FALLBACK: StoredAccountData = {
   trades: mockTrades,
   openPositions: mockOpenPositions,
   account: mockAccount,
   isLive: false,
   loading: false,
+  worstFloating: null,
+  floatingHistory: [],
+  totalNetCapital: ACCOUNT_START_BALANCE,
+  lastSyncAt: null,
+  lastCheckedAt: null,
+  connectionError: null,
+}
+
+// Genuine "nothing loaded yet" state while the real Supabase fetch is in
+// flight — no fabricated balances/trades, so a loading screen can key off
+// lastSyncAt === null instead of ever rendering placeholder numbers.
+const EMPTY: StoredAccountData = {
+  trades: [],
+  openPositions: [],
+  account: { startBalance: 0, balance: 0, equity: 0, currency: 'USD', symbol: mockAccount.symbol },
+  isLive: false,
+  loading: true,
   worstFloating: null,
   floatingHistory: [],
   totalNetCapital: ACCOUNT_START_BALANCE,
@@ -86,10 +107,7 @@ interface AccountSnapshotRow {
 }
 
 export function useAccountData(): AccountData {
-  const [data, setData] = useState<StoredAccountData>({
-    ...FALLBACK,
-    loading: isSupabaseConfigured,
-  })
+  const [data, setData] = useState<StoredAccountData>(isSupabaseConfigured ? EMPTY : DEMO_FALLBACK)
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -165,7 +183,7 @@ export function useAccountData(): AccountData {
       const checkedAt = new Date().toISOString()
       if (!snapshotRes.data) {
         setData({
-          ...FALLBACK,
+          ...EMPTY,
           loading: false,
           lastCheckedAt: checkedAt,
         })
