@@ -12,6 +12,7 @@ const PASSWORDS: Record<string, PartnerIdentity> = {
   '2009oca5.': { personName: 'Uri', isAdmin: true },
   '1307Marti': { personName: 'Busi', isAdmin: false },
   'Rem20263': { personName: 'Aina', isAdmin: false },
+  'EMMITI67': { personName: 'Emma', isAdmin: false },
 }
 
 const STORAGE_KEY = 'socis-identity'
