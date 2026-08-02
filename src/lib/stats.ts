@@ -29,9 +29,9 @@ export interface Basket {
 
 const BASKET_CLOSE_GAP_SECONDS = 3
 
-// A basket that closes within this % of balance (either direction) is
-// almost certainly just swap fees eating a flat position, not a real win
-// or loss — counted as break-even instead of padding/hurting win rate.
+// A basket that closes as a small loss within this % of balance is almost
+// certainly just swap fees eating a flat position, not a real trading loss
+// — counted as break-even instead of hurting win rate.
 const BASKET_BREAKEVEN_PCT = 0.12
 
 export interface FloatingPoint {
@@ -107,8 +107,11 @@ export function groupIntoBaskets(trades: Trade[]): Basket[] {
     const closeTime = legs[legs.length - 1].closeTime
     const balanceBefore = legs[legs.length - 1].balanceAfter - pnl
     const pnlPct = balanceBefore > 0 ? (pnl / balanceBefore) * 100 : 0
-    const isBreakEven = Math.abs(pnlPct) <= BASKET_BREAKEVEN_PCT
-    return { closeTime, legs, pnl, isWin: !isBreakEven && pnl > 0, isLoss: !isBreakEven && pnl < 0 }
+    // Only a small *loss* gets reclassified as break-even (almost certainly
+    // just swap fees eating a flat position) — a small win is still a real
+    // win no matter how small.
+    const isBreakEven = pnl < 0 && Math.abs(pnlPct) <= BASKET_BREAKEVEN_PCT
+    return { closeTime, legs, pnl, isWin: pnl > 0, isLoss: pnl < 0 && !isBreakEven }
   })
 }
 
@@ -212,7 +215,10 @@ export function computeStats(
 
   const grossProfit = wins.reduce((s, b) => s + b.pnl, 0)
   const grossLoss = Math.abs(losses.reduce((s, b) => s + b.pnl, 0))
-  const totalPnl = Number((grossProfit - grossLoss).toFixed(2))
+  // Sum every basket's real money, not just wins minus losses — a
+  // break-even basket still moved real dollars (e.g. a swap loss) even
+  // though it's excluded from the win/loss labels above.
+  const totalPnl = Number(baskets.reduce((s, b) => s + b.pnl, 0).toFixed(2))
 
   const equityCurve = buildEquityCurve(trades, startBalance)
   const maxDrawdownPct = Math.min(0, ...equityCurve.map((p) => p.drawdownPct))
@@ -229,7 +235,8 @@ export function computeStats(
     .filter((t) => dashboardDateKey(t.closeTime) === today)
     .reduce((s, t) => s + t.pnl, 0)
 
-  const winRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0
+  const decidedTrades = wins.length + losses.length
+  const winRate = decidedTrades > 0 ? (wins.length / decidedTrades) * 100 : 0
   const avgWin = wins.length > 0 ? grossProfit / wins.length : 0
   const avgLoss = losses.length > 0 ? grossLoss / losses.length : 0
 

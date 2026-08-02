@@ -46,6 +46,7 @@ export function TradeHistoryTable({
               <th className="font-medium py-2 pr-3">Lots</th>
               <th className="font-medium py-2 pr-3">Entrada mitjana</th>
               <th className="font-medium py-2 pr-3 text-right">Pitjor floating registrat</th>
+              <th className="font-medium py-2 pr-3 text-center">Resultat</th>
               <th className="font-medium py-2 text-right">P&amp;L</th>
             </tr>
           </thead>
@@ -103,6 +104,19 @@ export function TradeHistoryTable({
                     >
                       {worstFloating !== null ? formatPercent(worstFloating.pct, 0) : '—'}
                     </td>
+                    <td className="py-2 pr-3 text-center">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${
+                          basket.isWin
+                            ? 'text-[var(--good-text)] bg-[var(--good)]/10'
+                            : basket.isLoss
+                              ? 'text-[var(--critical)] bg-[var(--critical)]/10'
+                              : 'text-[var(--text-muted)] bg-[var(--surface-2)]'
+                        }`}
+                      >
+                        {basket.isWin ? 'W' : basket.isLoss ? 'L' : 'BE'}
+                      </span>
+                    </td>
                     <td
                       className={`py-2 text-right tabular font-semibold ${
                         basket.pnl >= 0 ? 'text-[var(--good-text)]' : 'text-[var(--critical)]'
@@ -114,7 +128,7 @@ export function TradeHistoryTable({
                   {isOpen && (
                     <tr key={`${key}-detail`} className="border-b border-[var(--border)] last:border-0">
                       <td className="py-2 pl-3" />
-                      <td colSpan={7} className="py-2 pr-3">
+                      <td colSpan={8} className="py-2 pr-3">
                         <table className="w-full text-[11px]">
                           <thead>
                             <tr className="text-left text-[var(--text-muted)]">
