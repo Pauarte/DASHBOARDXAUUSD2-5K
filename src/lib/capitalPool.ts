@@ -1,4 +1,4 @@
-import { dashboardDateKey } from './format'
+import { dashboardDateKey, isWeekend } from './format'
 import type { Trade } from './types'
 
 export type ContributionType = 'deposit' | 'withdrawal'
@@ -64,6 +64,11 @@ export function personValueOverTime(
       if (row.personName === personName) personUnits += row.unitsDelta
       rowIndex += 1
     }
+    // The market is closed weekends — those snapshots are just the balance
+    // sitting flat, and including one-per-minute of them turns the chart
+    // into a long horizontal plateau every Sat/Sun for no informational
+    // value. Skip them.
+    if (isWeekend(dashboardDateKey(snapshot.recordedAt))) continue
     // Skip everything before this person's first contribution — otherwise
     // the chart shows a flat $0 line for the whole account history before
     // they even joined, instead of starting right at their own first value.
