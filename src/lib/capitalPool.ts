@@ -43,6 +43,20 @@ export interface PersonValuePoint {
   value: number
 }
 
+// A contribution's real money can land in the account before someone gets
+// around to registering it in the ledger (the row is created after the
+// fact) — if we only gated on createdAt, every snapshot in that gap would
+// pair the *new* balance with the *old* unit count, making everyone's value
+// spike by the deposit amount until the row's timestamp caught up. Treat a
+// contribution as already in effect the moment the balance itself reflects
+// it, whichever comes first.
+function contributionInEffect(row: ContributionRow, snapshot: { recordedAt: string; balance: number }): boolean {
+  if (row.createdAt <= snapshot.recordedAt) return true
+  const signedAmount = row.type === 'deposit' ? row.amount : -row.amount
+  const expectedBalance = row.poolValueBefore + signedAmount
+  return signedAmount >= 0 ? snapshot.balance >= expectedBalance - 0.01 : snapshot.balance <= expectedBalance + 0.01
+}
+
 // Reconstructs one person's $ value over time from the account's balance
 // history plus the contribution ledger — at each balance snapshot, the
 // person's value is (their units at that point / total units at that
@@ -58,7 +72,7 @@ export function personValueOverTime(
   let personUnits = 0
 
   for (const snapshot of balanceHistory) {
-    while (rowIndex < rows.length && rows[rowIndex].createdAt <= snapshot.recordedAt) {
+    while (rowIndex < rows.length && contributionInEffect(rows[rowIndex], snapshot)) {
       const row = rows[rowIndex]
       totalUnits += row.unitsDelta
       if (row.personName === personName) personUnits += row.unitsDelta
