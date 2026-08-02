@@ -43,3 +43,11 @@ export function dashboardDateKey(iso: string): string {
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}-${values.month}-${values.day}`
 }
+
+// dateKey is a plain "YYYY-MM-DD" dashboard date (already resolved to
+// Europe/Madrid, see dashboardDateKey) — parse it as UTC noon so the day-of
+// -week check can't be shifted by the runtime's own local timezone.
+export function isWeekend(dateKey: string): boolean {
+  const day = new Date(`${dateKey}T12:00:00Z`).getUTCDay()
+  return day === 0 || day === 6
+}

@@ -1,5 +1,5 @@
 import type { Trade } from './types'
-import { dashboardDateKey } from './format'
+import { dashboardDateKey, isWeekend } from './format'
 import { floatingSeverityPct } from './floatingRisk'
 
 export interface EquityPoint {
@@ -196,6 +196,10 @@ export function buildDailyReturnPct(
   const daily = buildDailyPnl(trades)
   const pctByDay = new Map<string, number>()
   for (const day of daily) {
+    // The market is closed weekends — any weekend "day" in here is stray
+    // data (or a sync artifact), not a real trading day, and shouldn't
+    // dilute the daily average.
+    if (isWeekend(day.date)) continue
     const dayStartBalance = balanceBeforeDay(balanceHistory, day.date, startBalance)
     pctByDay.set(day.date, dayStartBalance > 0 ? (day.pnl / dayStartBalance) * 100 : 0)
   }
