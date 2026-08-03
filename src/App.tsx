@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildDailyPnl, buildDailyReturnPct, buildEquityCurve, computeStats } from './lib/stats'
+import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
 import { formatDateTime, formatPercent } from './lib/format'
 import { useCurrencyFormatter } from './lib/currency'
 import { floatingSeverityPct } from './lib/floatingRisk'
@@ -105,13 +105,15 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
       cancelled = true
     }
   }, [])
-  const arteAvgDailyReturnPct = useMemo(() => {
+  const arteDailyPct = useMemo(() => {
     const arteTrades = scaleTradesForPerson(trades, contributionRows, 'Arte')
     const arteValueHistory = personValueOverTime(contributionRows, 'Arte', floatingHistory)
-    const arteDailyPct = personDailyReturnPct(buildDailyPnl(arteTrades), arteValueHistory)
+    return personDailyReturnPct(buildDailyPnl(arteTrades), arteValueHistory)
+  }, [trades, contributionRows, floatingHistory])
+  const arteAvgDailyReturnPct = useMemo(() => {
     const pcts = Array.from(arteDailyPct.values())
     return pcts.length > 0 ? pcts.reduce((s, p) => s + p, 0) / pcts.length : 0
-  }, [trades, contributionRows, floatingHistory])
+  }, [arteDailyPct])
   const floatingPnl = account.equity - account.balance
   // Real trading P&L: balance minus everything partners have ever put in
   // or taken out (from /socis), not the bot's fixed genesis balance — so
@@ -128,10 +130,6 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     [trades, account.startBalance, capitalAdjustedBalance, lastSyncAt],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
-  const dailyPct = useMemo(
-    () => buildDailyReturnPct(trades, account.startBalance, floatingHistory),
-    [trades, account.startBalance, floatingHistory],
-  )
 
   const totalReturnPct = ((account.balance - totalNetCapital) / totalNetCapital) * 100
 
@@ -299,7 +297,7 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
 
         <DailyPnlChart data={dailyPnl} />
 
-        <CalendarHeatmap trades={trades} dailyPct={dailyPct} />
+        <CalendarHeatmap trades={trades} dailyPct={arteDailyPct} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
