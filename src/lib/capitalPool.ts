@@ -127,6 +127,7 @@ export function personDailyReturnPct(
 ): Map<string, number> {
   const pctByDay = new Map<string, number>()
   for (const day of dailyPnl) {
+    if (isWeekend(day.date)) continue
     const startValue = valueBeforeDay(valueHistory, day.date)
     pctByDay.set(day.date, startValue && startValue > 0 ? (day.pnl / startValue) * 100 : 0)
   }

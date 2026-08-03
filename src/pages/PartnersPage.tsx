@@ -143,6 +143,12 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
     () => personDailyReturnPct(dailyPnl, myValueHistory),
     [dailyPnl, myValueHistory],
   )
+  // Own share, day by day — not the whole bot's raw average, which ignores
+  // dilution from other partners' deposits/withdrawals on any given day.
+  const myAvgDailyReturnPct = useMemo(() => {
+    const pcts = Array.from(myDailyPct.values())
+    return pcts.length > 0 ? pcts.reduce((s, p) => s + p, 0) / pcts.length : 0
+  }, [myDailyPct])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -298,8 +304,8 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             <StatTile label="Win rate" value={formatPercent(stats.winRate)} />
             <StatTile
               label="Mitjana diària"
-              value={formatPercent(stats.avgDailyReturnPct, 2)}
-              tone={stats.avgDailyReturnPct >= 0 ? 'good' : 'critical'}
+              value={formatPercent(myAvgDailyReturnPct, 2)}
+              tone={myAvgDailyReturnPct >= 0 ? 'good' : 'critical'}
             />
             <StatTile
               label="Millor / pitjor cistella"
