@@ -15,6 +15,32 @@ export interface ContributionRow {
   createdAt: string
 }
 
+export interface ContributionDbRow {
+  id: number
+  person_name: string
+  type: ContributionType
+  amount: string | number
+  pool_value_before: string | number
+  units_before: string | number
+  units_delta: string | number
+  note: string | null
+  created_at: string
+}
+
+export function mapContributionRow(r: ContributionDbRow): ContributionRow {
+  return {
+    id: r.id,
+    personName: r.person_name,
+    type: r.type,
+    amount: Number(r.amount),
+    poolValueBefore: Number(r.pool_value_before),
+    unitsBefore: Number(r.units_before),
+    unitsDelta: Number(r.units_delta),
+    note: r.note,
+    createdAt: r.created_at,
+  }
+}
+
 export interface PersonStake {
   personName: string
   units: number

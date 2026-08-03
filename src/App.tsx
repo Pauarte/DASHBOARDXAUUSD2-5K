@@ -4,6 +4,14 @@ import { formatDateTime, formatPercent } from './lib/format'
 import { useCurrencyFormatter } from './lib/currency'
 import { floatingSeverityPct } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
+import { supabase } from './lib/supabaseClient'
+import {
+  mapContributionRow,
+  personDailyReturnPct,
+  personValueOverTime,
+  scaleTradesForPerson,
+  type ContributionRow,
+} from './lib/capitalPool'
 import { StatTile } from './components/StatTile'
 import { EquityCurveChart } from './components/EquityCurveChart'
 import { DailyPnlChart } from './components/DailyPnlChart'
@@ -76,6 +84,34 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     () => computeStats(trades, account.startBalance, floatingHistory),
     [trades, account.startBalance, floatingHistory],
   )
+
+  // "Mitjana diària" here is Arte's own personal daily return (same
+  // fund-unit math as /socis), not the whole bot's raw average — the
+  // bot's own number ignores dilution from partner deposits/withdrawals,
+  // and the ask was for the total dashboard to just mirror what Arte sees.
+  const [contributionRows, setContributionRows] = useState<ContributionRow[]>([])
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    supabase
+      .from('capital_contributions')
+      .select('id, person_name, type, amount, pool_value_before, units_before, units_delta, note, created_at')
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return
+        setContributionRows(data.map(mapContributionRow))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const arteAvgDailyReturnPct = useMemo(() => {
+    const arteTrades = scaleTradesForPerson(trades, contributionRows, 'Arte')
+    const arteValueHistory = personValueOverTime(contributionRows, 'Arte', floatingHistory)
+    const arteDailyPct = personDailyReturnPct(buildDailyPnl(arteTrades), arteValueHistory)
+    const pcts = Array.from(arteDailyPct.values())
+    return pcts.length > 0 ? pcts.reduce((s, p) => s + p, 0) / pcts.length : 0
+  }, [trades, contributionRows, floatingHistory])
   const floatingPnl = account.equity - account.balance
   // Real trading P&L: balance minus everything partners have ever put in
   // or taken out (from /socis), not the bot's fixed genesis balance — so
@@ -234,8 +270,8 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           <StatTile label="Win rate" value={formatPercent(stats.winRate)} />
           <StatTile
             label="Mitjana diària"
-            value={formatPercent(stats.avgDailyReturnPct, 2)}
-            tone={stats.avgDailyReturnPct >= 0 ? 'good' : 'critical'}
+            value={formatPercent(arteAvgDailyReturnPct, 2)}
+            tone={arteAvgDailyReturnPct >= 0 ? 'good' : 'critical'}
           />
           <StatTile
             label="Millor / pitjor cistella"

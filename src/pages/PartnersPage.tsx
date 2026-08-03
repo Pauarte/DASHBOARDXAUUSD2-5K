@@ -3,11 +3,13 @@ import { supabase, isSupabaseConfigured, fetchAllRows } from '../lib/supabaseCli
 import { useAccountData } from '../lib/useAccountData'
 import {
   computeStakes,
+  mapContributionRow,
   personDailyReturnPct,
   personTodayChange,
   personValueOverTime,
   scaleTradesForPerson,
   unitsForAmount,
+  type ContributionDbRow,
   type ContributionRow,
   type ContributionType,
   type PersonStake,
@@ -22,32 +24,6 @@ import { PasswordGate } from '../components/PasswordGate'
 import { DailyPnlChart } from '../components/DailyPnlChart'
 import { CalendarHeatmap } from '../components/CalendarHeatmap'
 import { CurrencyToggle } from '../components/CurrencyToggle'
-
-interface ContributionDbRow {
-  id: number
-  person_name: string
-  type: ContributionType
-  amount: string | number
-  pool_value_before: string | number
-  units_before: string | number
-  units_delta: string | number
-  note: string | null
-  created_at: string
-}
-
-function mapRow(r: ContributionDbRow): ContributionRow {
-  return {
-    id: r.id,
-    personName: r.person_name,
-    type: r.type,
-    amount: Number(r.amount),
-    poolValueBefore: Number(r.pool_value_before),
-    unitsBefore: Number(r.units_before),
-    unitsDelta: Number(r.units_delta),
-    note: r.note,
-    createdAt: r.created_at,
-  }
-}
 
 export function PartnersPage() {
   return (
@@ -101,7 +77,7 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
     if (contributionsRes.error) {
       setError(contributionsRes.error.message)
     } else {
-      setRows(((contributionsRes.data as ContributionDbRow[] | null) ?? []).map(mapRow))
+      setRows(((contributionsRes.data as ContributionDbRow[] | null) ?? []).map(mapContributionRow))
       setError(null)
     }
     if (!balanceRes.error) {
