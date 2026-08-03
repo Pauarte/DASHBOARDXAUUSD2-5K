@@ -188,7 +188,7 @@ export function CalendarHeatmap({ trades, dailyPct }: { trades: Trade[]; dailyPc
                   onMouseEnter={() => setSelected(cell)}
                   onFocus={() => setSelected(cell)}
                   onClick={() => setSelected(cell)}
-                  className={`calendar-cell relative aspect-square rounded-lg border text-left px-1.5 py-1.5 sm:px-2 sm:py-2 flex flex-col justify-between transition-all ${
+                  className={`calendar-cell relative aspect-square rounded-lg border px-1.5 py-1.5 sm:px-2 sm:py-2 flex flex-col items-center transition-all ${
                     isSelected
                       ? 'border-[var(--baseline)] ring-2 ring-[var(--baseline)] ring-offset-1 ring-offset-[var(--surface-card)]'
                       : 'border-[var(--border)] hover:border-[var(--baseline)]'
@@ -196,20 +196,20 @@ export function CalendarHeatmap({ trades, dailyPct }: { trades: Trade[]; dailyPc
                   style={bg === 'transparent' ? undefined : { backgroundColor: bg }}
                 >
                   <span
-                    className={`inline-flex items-center justify-center text-[11px] sm:text-xs tabular ${
+                    className={`self-start inline-flex items-center justify-center text-[11px] sm:text-xs tabular ${
                       cell.trades > 0 ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-muted)]'
                     } ${isToday ? 'w-5 h-5 rounded-full ring-1 ring-[var(--text-primary)]' : ''}`}
                   >
                     {Number(cell.date.slice(8, 10))}
                   </span>
                   {cell.trades > 0 && (
-                    <span className="flex flex-col leading-tight">
-                      <span className="text-[11px] sm:text-xs font-semibold tabular text-[var(--text-primary)]">
+                    <span className="flex-1 flex flex-col items-center justify-center gap-0.5 leading-tight">
+                      <span className="text-xs sm:text-sm font-semibold tabular text-[var(--text-primary)]">
                         {cell.pnl >= 0 ? '+' : ''}
                         {Math.round(toDisplayCurrency(cell.pnl))}
                       </span>
                       {dailyPct && (
-                        <span className="text-[9px] sm:text-[10px] tabular text-[var(--text-muted)]">
+                        <span className="text-[10px] sm:text-[11px] tabular text-[var(--text-muted)]">
                           {formatPercent(cell.pct, 1)}
                         </span>
                       )}
