@@ -1,7 +1,9 @@
 import type { OpenPosition } from '../lib/types'
-import { formatCurrency, formatDateTime } from '../lib/format'
+import { formatDateTime } from '../lib/format'
+import { useCurrencyFormatter } from '../lib/currency'
 
 export function OpenPositionsCard({ positions }: { positions: OpenPosition[] }) {
+  const formatCurrency = useCurrencyFormatter()
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">

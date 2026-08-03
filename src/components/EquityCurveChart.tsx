@@ -1,11 +1,14 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { EquityPoint } from '../lib/stats'
-import { formatCurrency, formatDateTime } from '../lib/format'
+import { formatDateTime } from '../lib/format'
+import { useCurrencyFormatter, useCurrencySymbolFormatter } from '../lib/currency'
 import { ChartTooltip } from './ChartTooltip'
 import { useThemeColors } from '../lib/useThemeColors'
 
 export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
   const colors = useThemeColors()
+  const formatCurrency = useCurrencyFormatter()
+  const formatAxisCurrency = useCurrencySymbolFormatter()
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">
@@ -29,7 +32,7 @@ export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
           />
           <YAxis
             domain={['dataMin - 20', 'dataMax + 20']}
-            tickFormatter={(v) => `$${Math.round(v).toLocaleString()}`}
+            tickFormatter={formatAxisCurrency}
             tick={{ fill: colors.textMuted, fontSize: 11 }}
             stroke={colors.baseline}
             width={64}

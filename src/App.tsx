@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildDailyReturnPct, buildEquityCurve, computeStats } from './lib/stats'
-import { formatCurrency, formatDateTime, formatPercent } from './lib/format'
+import { formatDateTime, formatPercent } from './lib/format'
+import { useCurrencyFormatter } from './lib/currency'
 import { floatingSeverityPct } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
 import { StatTile } from './components/StatTile'
@@ -10,6 +11,7 @@ import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
 import { ConnectionStatus } from './components/ConnectionStatus'
+import { CurrencyToggle } from './components/CurrencyToggle'
 import { useConnectionAlerts } from './lib/useConnectionAlerts'
 import { PasswordGate } from './components/PasswordGate'
 import type { PartnerIdentity } from './lib/partnersAuth'
@@ -23,6 +25,7 @@ function App() {
 }
 
 function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
+  const formatCurrency = useCurrencyFormatter()
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   useEffect(() => {
     const handler = (event: Event) => {
@@ -133,6 +136,7 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
               >
                 Sortir
               </button>
+              <CurrencyToggle />
             </div>
             <p className="text-xs text-[var(--text-muted)]">
               Connectat com a <span className="font-semibold">{identity.personName}</span>

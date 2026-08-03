@@ -1,11 +1,14 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { DailyPnl } from '../lib/stats'
-import { formatCurrency, formatDate } from '../lib/format'
+import { formatDate } from '../lib/format'
+import { useCurrencyFormatter, useCurrencySymbolFormatter } from '../lib/currency'
 import { ChartTooltip } from './ChartTooltip'
 import { useThemeColors } from '../lib/useThemeColors'
 
 export function DailyPnlChart({ data }: { data: DailyPnl[] }) {
   const colors = useThemeColors()
+  const formatCurrency = useCurrencyFormatter()
+  const formatAxisCurrency = useCurrencySymbolFormatter()
   const recent = data.slice(-30)
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
@@ -23,7 +26,7 @@ export function DailyPnlChart({ data }: { data: DailyPnl[] }) {
             minTickGap={24}
           />
           <YAxis
-            tickFormatter={(v) => `$${Math.round(v)}`}
+            tickFormatter={formatAxisCurrency}
             tick={{ fill: colors.textMuted, fontSize: 11 }}
             stroke={colors.baseline}
             width={56}
