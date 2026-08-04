@@ -17,7 +17,6 @@ import {
 import { buildDailyPnl, computeStats } from '../lib/stats'
 import { formatDateTime, formatPercent } from '../lib/format'
 import { useCurrencyFormatter } from '../lib/currency'
-import { worstFloatingIn } from '../lib/floatingRisk'
 import { ALL_TIME, balanceAtRangeStart, filterByCloseTime, filterByRecordedAt, type DateRange } from '../lib/dateRange'
 import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
@@ -62,8 +61,6 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
     () => balanceAtRangeStart(balanceHistory, dateRange, account.startBalance),
     [balanceHistory, dateRange, account.startBalance],
   )
-  const periodWorstFloating = useMemo(() => worstFloatingIn(filteredBalanceHistory), [filteredBalanceHistory])
-
   const stats = useMemo(
     () => computeStats(filteredTrades, periodStartBalance, filteredBalanceHistory),
     [filteredTrades, periodStartBalance, filteredBalanceHistory],
@@ -298,16 +295,6 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             <DateRangeFilter range={dateRange} onChange={setDateRange} />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatTile
-              label="Pitjor floating registrat"
-              value={periodWorstFloating ? formatPercent(periodWorstFloating.pct, 0) : '—'}
-              sub={
-                periodWorstFloating
-                  ? formatCurrency(periodWorstFloating.value * myShare, { signed: true })
-                  : 'Encara sense dades'
-              }
-              tone="critical"
-            />
             <StatTile
               label="Operacions tancades"
               value={stats.totalTrades.toString()}

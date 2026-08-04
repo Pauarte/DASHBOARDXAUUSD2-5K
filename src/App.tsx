@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
-import { formatDateTime, formatPercent, dashboardDateKey } from './lib/format'
+import { formatPercent, dashboardDateKey } from './lib/format'
 import { useCurrencyFormatter } from './lib/currency'
-import { floatingSeverityPct, worstFloatingIn } from './lib/floatingRisk'
+import { floatingSeverityPct } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
 import { supabase } from './lib/supabaseClient'
 import {
@@ -101,8 +101,6 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     () => computeStats(filteredTrades, periodStartBalance, filteredFloatingHistory),
     [filteredTrades, periodStartBalance, filteredFloatingHistory],
   )
-  const periodWorstFloating = useMemo(() => worstFloatingIn(filteredFloatingHistory), [filteredFloatingHistory])
-
   // "Mitjana diària" here is Arte's own personal daily return (same
   // fund-unit math as /socis), not the whole bot's raw average — the
   // bot's own number ignores dilution from partner deposits/withdrawals,
@@ -278,16 +276,6 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
             value={formatPercent(floatingSeverityPct(floatingPnl, account.balance), 0)}
             sub={`${formatCurrency(floatingPnl, { signed: true })} · ${openPositions.length} posicions obertes`}
             tone={floatingPnl >= 0 ? 'good' : 'critical'}
-          />
-          <StatTile
-            label="Pitjor floating registrat"
-            value={periodWorstFloating ? formatPercent(periodWorstFloating.pct, 0) : '—'}
-            sub={
-              periodWorstFloating
-                ? `${formatCurrency(periodWorstFloating.value, { signed: true })} · ${formatDateTime(periodWorstFloating.at)}`
-                : 'Encara sense dades'
-            }
-            tone="critical"
           />
           <StatTile
             label="P&L d’avui"
