@@ -9,7 +9,10 @@ export function DailyPnlChart({ data }: { data: DailyPnl[] }) {
   const colors = useThemeColors()
   const formatCurrency = useCurrencyFormatter()
   const formatAxisCurrency = useCurrencySymbolFormatter()
-  const recent = data.slice(-30)
+  // All bars grow upward from the baseline regardless of sign — direction
+  // (green/red) is the only thing that carries win vs. loss now, height is
+  // pure magnitude. The tooltip still shows the real signed value.
+  const recent = data.slice(-30).map((d) => ({ ...d, magnitude: Math.abs(d.pnl) }))
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
       <div className="flex items-baseline justify-between mb-3">
@@ -50,7 +53,7 @@ export function DailyPnlChart({ data }: { data: DailyPnl[] }) {
               )
             }}
           />
-          <Bar dataKey="pnl" isAnimationActive={false} radius={[4, 4, 0, 0]} maxBarSize={18}>
+          <Bar dataKey="magnitude" isAnimationActive={false} radius={[4, 4, 0, 0]} maxBarSize={18}>
             {recent.map((d) => (
               <Cell key={d.date} fill={d.pnl >= 0 ? colors.good : colors.critical} />
             ))}
