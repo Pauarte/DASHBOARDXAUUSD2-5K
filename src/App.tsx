@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
-import { formatDateTime, formatPercent } from './lib/format'
+import { formatDateTime, formatPercent, dashboardDateKey } from './lib/format'
 import { useCurrencyFormatter } from './lib/currency'
-import { floatingSeverityPct } from './lib/floatingRisk'
+import { floatingSeverityPct, worstFloatingIn } from './lib/floatingRisk'
 import { useAccountData } from './lib/useAccountData'
 import { supabase } from './lib/supabaseClient'
 import {
@@ -12,6 +12,7 @@ import {
   scaleTradesForPerson,
   type ContributionRow,
 } from './lib/capitalPool'
+import { ALL_TIME, balanceAtRangeStart, filterByCloseTime, filterByRecordedAt, type DateRange } from './lib/dateRange'
 import { StatTile } from './components/StatTile'
 import { EquityCurveChart } from './components/EquityCurveChart'
 import { DailyPnlChart } from './components/DailyPnlChart'
@@ -20,6 +21,7 @@ import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
 import { ConnectionStatus } from './components/ConnectionStatus'
 import { CurrencyToggle } from './components/CurrencyToggle'
+import { DateRangeFilter } from './components/DateRangeFilter'
 import { useConnectionAlerts } from './lib/useConnectionAlerts'
 import { PasswordGate } from './components/PasswordGate'
 import type { PartnerIdentity } from './lib/partnersAuth'
@@ -56,7 +58,6 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     account,
     isLive,
     loading,
-    worstFloating,
     floatingHistory,
     totalNetCapital,
     lastSyncAt,
@@ -80,10 +81,27 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     document.title = hasConnectionAlert ? '[ALERTA] Monitor Bots Trading' : 'Monitor Bots Trading'
   }, [hasConnectionAlert])
 
-  const stats = useMemo(
-    () => computeStats(trades, account.startBalance, floatingHistory),
-    [trades, account.startBalance, floatingHistory],
+  // Every stat/chart below is scoped to this — defaults to all-time.
+  const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME)
+  const isRangeOpenEnded = !dateRange.end || dateRange.end >= dashboardDateKey(new Date().toISOString())
+  const filteredTrades = useMemo(() => filterByCloseTime(trades, dateRange), [trades, dateRange])
+  const filteredFloatingHistory = useMemo(
+    () => filterByRecordedAt(floatingHistory, dateRange),
+    [floatingHistory, dateRange],
   )
+  // The real balance the period actually started with, not the account's
+  // all-time genesis balance — otherwise a "last 7 days" filter would base
+  // % returns/drawdown off months of unrelated prior growth.
+  const periodStartBalance = useMemo(
+    () => balanceAtRangeStart(floatingHistory, dateRange, account.startBalance),
+    [floatingHistory, dateRange, account.startBalance],
+  )
+
+  const stats = useMemo(
+    () => computeStats(filteredTrades, periodStartBalance, filteredFloatingHistory),
+    [filteredTrades, periodStartBalance, filteredFloatingHistory],
+  )
+  const periodWorstFloating = useMemo(() => worstFloatingIn(filteredFloatingHistory), [filteredFloatingHistory])
 
   // "Mitjana diària" here is Arte's own personal daily return (same
   // fund-unit math as /socis), not the whole bot's raw average — the
@@ -106,10 +124,13 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
     }
   }, [])
   const arteDailyPct = useMemo(() => {
-    const arteTrades = scaleTradesForPerson(trades, contributionRows, 'Arte')
+    // Full (unfiltered) history for the value series — it needs everything
+    // before the range too, to know Arte's real value the moment the
+    // period started. Only which days show up comes from filteredTrades.
+    const arteTrades = scaleTradesForPerson(filteredTrades, contributionRows, 'Arte')
     const arteValueHistory = personValueOverTime(contributionRows, 'Arte', floatingHistory)
     return personDailyReturnPct(buildDailyPnl(arteTrades), arteValueHistory)
-  }, [trades, contributionRows, floatingHistory])
+  }, [filteredTrades, contributionRows, floatingHistory])
   const arteAvgDailyReturnPct = useMemo(() => {
     const pcts = Array.from(arteDailyPct.values())
     return pcts.length > 0 ? pcts.reduce((s, p) => s + p, 0) / pcts.length : 0
@@ -120,16 +141,24 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
   // a partner deposit/withdrawal never shows up as a fake sync gap here.
   const accountTotalPnl = account.balance - totalNetCapital
   const historyGap = Number((accountTotalPnl - stats.totalPnl).toFixed(2))
-  const hasHistoryGap = isLive && Math.abs(historyGap) >= 0.01
+  const hasHistoryGap = isLive && !dateRange.start && !dateRange.end && Math.abs(historyGap) >= 0.01
   // Bridge to a "current" point using the capital-adjusted balance (genesis
   // + real trading P&L), not the raw account balance — otherwise a partner
-  // deposit/withdrawal shows up as a fake jump on the profit curve.
+  // deposit/withdrawal shows up as a fake jump on the profit curve. Only
+  // makes sense when the filtered range actually reaches today; a closed
+  // historical range just ends at its last trade.
   const capitalAdjustedBalance = account.startBalance + accountTotalPnl
   const equityCurve = useMemo(
-    () => buildEquityCurve(trades, account.startBalance, capitalAdjustedBalance, lastSyncAt),
-    [trades, account.startBalance, capitalAdjustedBalance, lastSyncAt],
+    () =>
+      buildEquityCurve(
+        filteredTrades,
+        periodStartBalance,
+        isRangeOpenEnded ? capitalAdjustedBalance : undefined,
+        isRangeOpenEnded ? lastSyncAt : undefined,
+      ),
+    [filteredTrades, periodStartBalance, isRangeOpenEnded, capitalAdjustedBalance, lastSyncAt],
   )
-  const dailyPnl = useMemo(() => buildDailyPnl(trades), [trades])
+  const dailyPnl = useMemo(() => buildDailyPnl(filteredTrades), [filteredTrades])
 
   const totalReturnPct = ((account.balance - totalNetCapital) / totalNetCapital) * 100
 
@@ -237,6 +266,11 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           onDisableAlerts={disableAlerts}
         />
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Estadístiques</h2>
+          <DateRangeFilter range={dateRange} onChange={setDateRange} />
+        </div>
+
         <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatTile label="Balance" value={formatCurrency(account.balance)} />
           <StatTile
@@ -247,10 +281,10 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           />
           <StatTile
             label="Pitjor floating registrat"
-            value={worstFloating ? formatPercent(worstFloating.pct, 0) : '—'}
+            value={periodWorstFloating ? formatPercent(periodWorstFloating.pct, 0) : '—'}
             sub={
-              worstFloating
-                ? `${formatCurrency(worstFloating.value, { signed: true })} · ${formatDateTime(worstFloating.at)}`
+              periodWorstFloating
+                ? `${formatCurrency(periodWorstFloating.value, { signed: true })} · ${formatDateTime(periodWorstFloating.at)}`
                 : 'Encara sense dades'
             }
             tone="critical"
@@ -297,11 +331,11 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
 
         <DailyPnlChart data={dailyPnl} />
 
-        <CalendarHeatmap trades={trades} dailyPct={arteDailyPct} />
+        <CalendarHeatmap trades={filteredTrades} dailyPct={arteDailyPct} />
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
-            <TradeHistoryTable trades={trades} floatingHistory={floatingHistory} />
+            <TradeHistoryTable trades={filteredTrades} floatingHistory={floatingHistory} />
           </div>
           <OpenPositionsCard positions={openPositions} />
         </section>

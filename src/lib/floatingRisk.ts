@@ -22,3 +22,18 @@ export function floatingSeverityPct(floatingPnl: number, balance: number): numbe
   const floatingMax = floatingMaxForBalance(balance)
   return floatingMax > 0 ? (floatingPnl / floatingMax) * 100 : 0
 }
+
+// The single worst (most negative) floating point within a slice of
+// history — feed it the full account history for the all-time figure, or
+// a date-filtered slice to scope "worst floating" to whatever period the
+// dashboard is currently filtered to.
+export function worstFloatingIn(
+  history: { recordedAt: string; floatingPnl: number; balance: number }[],
+): { value: number; pct: number; at: string } | null {
+  let worst: { recordedAt: string; floatingPnl: number; balance: number } | null = null
+  for (const point of history) {
+    if (worst === null || point.floatingPnl < worst.floatingPnl) worst = point
+  }
+  if (!worst) return null
+  return { value: worst.floatingPnl, pct: floatingSeverityPct(worst.floatingPnl, worst.balance), at: worst.recordedAt }
+}

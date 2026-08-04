@@ -17,6 +17,8 @@ import {
 import { buildDailyPnl, computeStats } from '../lib/stats'
 import { formatDateTime, formatPercent } from '../lib/format'
 import { useCurrencyFormatter } from '../lib/currency'
+import { worstFloatingIn } from '../lib/floatingRisk'
+import { ALL_TIME, balanceAtRangeStart, filterByCloseTime, filterByRecordedAt, type DateRange } from '../lib/dateRange'
 import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
 import { PersonalValueChart } from '../components/PersonalValueChart'
@@ -24,6 +26,7 @@ import { PasswordGate } from '../components/PasswordGate'
 import { DailyPnlChart } from '../components/DailyPnlChart'
 import { CalendarHeatmap } from '../components/CalendarHeatmap'
 import { CurrencyToggle } from '../components/CurrencyToggle'
+import { DateRangeFilter } from '../components/DateRangeFilter'
 
 export function PartnersPage() {
   return (
@@ -35,17 +38,35 @@ export function PartnersPage() {
 
 function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
   const formatCurrency = useCurrencyFormatter()
-  const { account, isLive, trades, openPositions, worstFloating } = useAccountData()
+  const { account, isLive, trades, openPositions } = useAccountData()
   const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
   const [rows, setRows] = useState<ContributionRow[]>([])
-  const [balanceHistory, setBalanceHistory] = useState<{ recordedAt: string; balance: number }[]>([])
+  const [balanceHistory, setBalanceHistory] = useState<{ recordedAt: string; balance: number; floatingPnl: number }[]>(
+    [],
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Every stat/chart below is scoped to this — defaults to all-time.
+  const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME)
+  const filteredTrades = useMemo(() => filterByCloseTime(trades, dateRange), [trades, dateRange])
+  const filteredBalanceHistory = useMemo(
+    () => filterByRecordedAt(balanceHistory, dateRange),
+    [balanceHistory, dateRange],
+  )
+  // The real balance the period actually started with, not the account's
+  // all-time genesis balance — otherwise a "last 7 days" filter would base
+  // % returns/drawdown off months of unrelated prior growth.
+  const periodStartBalance = useMemo(
+    () => balanceAtRangeStart(balanceHistory, dateRange, account.startBalance),
+    [balanceHistory, dateRange, account.startBalance],
+  )
+  const periodWorstFloating = useMemo(() => worstFloatingIn(filteredBalanceHistory), [filteredBalanceHistory])
+
   const stats = useMemo(
-    () => computeStats(trades, account.startBalance, balanceHistory),
-    [trades, account.startBalance, balanceHistory],
+    () => computeStats(filteredTrades, periodStartBalance, filteredBalanceHistory),
+    [filteredTrades, periodStartBalance, filteredBalanceHistory],
   )
 
   const [personName, setPersonName] = useState(identity.isAdmin ? '' : identity.personName)
@@ -65,10 +86,10 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
       // Paged — a single .limit() silently caps at Supabase's max-rows
       // (1000) once floating_pnl_snapshots grows past that, which was
       // quietly cutting off the most recent history.
-      fetchAllRows<{ recorded_at: string; balance: string | number }>((from, to) =>
+      fetchAllRows<{ recorded_at: string; balance: string | number; floating_pnl: string | number }>((from, to) =>
         supabase!
           .from('floating_pnl_snapshots')
-          .select('recorded_at, balance')
+          .select('recorded_at, balance, floating_pnl')
           .order('recorded_at', { ascending: true })
           .range(from, to),
       ).then((data) => ({ data, error: null as unknown })),
@@ -82,9 +103,13 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
     }
     if (!balanceRes.error) {
       setBalanceHistory(
-        ((balanceRes.data as Array<{ recorded_at: string; balance: string | number }> | null) ?? []).map((r) => ({
+        (
+          (balanceRes.data as Array<{ recorded_at: string; balance: string | number; floating_pnl: string | number }> | null) ??
+          []
+        ).map((r) => ({
           recordedAt: r.recorded_at,
           balance: Number(r.balance),
+          floatingPnl: Number(r.floating_pnl),
         })),
       )
     }
@@ -114,8 +139,8 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   const myShare = myStake ? myStake.percentage / 100 : 0
   const myFloating = myStake ? (floatingTotal * myStake.percentage) / 100 : 0
   const myTrades = useMemo(
-    () => scaleTradesForPerson(trades, rows, identity.personName),
-    [trades, rows, identity.personName],
+    () => scaleTradesForPerson(filteredTrades, rows, identity.personName),
+    [filteredTrades, rows, identity.personName],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(myTrades), [myTrades])
   const myDailyPct = useMemo(
@@ -266,14 +291,21 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
           </div>
           <PersonalValueChart data={myValueHistory} />
 
-          <p className="text-xs text-[var(--text-muted)] mt-2">
-            La teva part de cada mètrica del bot, segons el teu {formatPercent(myStake?.percentage ?? 0, 1)}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-2">
+            <p className="text-xs text-[var(--text-muted)]">
+              La teva part de cada mètrica del bot, segons el teu {formatPercent(myStake?.percentage ?? 0, 1)}
+            </p>
+            <DateRangeFilter range={dateRange} onChange={setDateRange} />
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatTile
               label="Pitjor floating registrat"
-              value={worstFloating ? formatPercent(worstFloating.pct, 0) : '—'}
-              sub={worstFloating ? formatCurrency(worstFloating.value * myShare, { signed: true }) : 'Encara sense dades'}
+              value={periodWorstFloating ? formatPercent(periodWorstFloating.pct, 0) : '—'}
+              sub={
+                periodWorstFloating
+                  ? formatCurrency(periodWorstFloating.value * myShare, { signed: true })
+                  : 'Encara sense dades'
+              }
               tone="critical"
             />
             <StatTile
