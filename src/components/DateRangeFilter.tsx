@@ -1,64 +1,25 @@
-import { dashboardDateKey, DASHBOARD_TIME_ZONE } from '../lib/format'
 import { ALL_TIME, type DateRange } from '../lib/dateRange'
 
-function todayKey(): string {
-  return dashboardDateKey(new Date().toISOString())
-}
-
-function daysAgoKey(days: number): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: DASHBOARD_TIME_ZONE,
-  }).formatToParts(new Date())
-  const values = Object.fromEntries(parts.map((p) => [p.type, p.value]))
-  const asUtcNoon = new Date(`${values.year}-${values.month}-${values.day}T12:00:00Z`)
-  asUtcNoon.setUTCDate(asUtcNoon.getUTCDate() - days)
-  return asUtcNoon.toISOString().slice(0, 10)
-}
-
-function monthStartKey(): string {
-  const today = todayKey()
-  return `${today.slice(0, 7)}-01`
-}
-
-const PRESETS: { label: string; range: () => DateRange }[] = [
-  { label: 'Avui', range: () => ({ start: todayKey(), end: todayKey() }) },
-  { label: '7 dies', range: () => ({ start: daysAgoKey(6), end: todayKey() }) },
-  { label: '30 dies', range: () => ({ start: daysAgoKey(29), end: todayKey() }) },
-  { label: 'Aquest mes', range: () => ({ start: monthStartKey(), end: todayKey() }) },
-  { label: 'Tot', range: () => ALL_TIME },
-]
-
-function sameRange(a: DateRange, b: DateRange): boolean {
-  return a.start === b.start && a.end === b.end
+function isAllTime(range: DateRange): boolean {
+  return !range.start && !range.end
 }
 
 export function DateRangeFilter({ range, onChange }: { range: DateRange; onChange: (range: DateRange) => void }) {
-  const activePreset = PRESETS.find((p) => sameRange(p.range(), range))
+  const allTimeActive = isAllTime(range)
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="inline-flex flex-wrap rounded-full border border-[var(--border)] p-0.5 text-xs font-medium">
-        {PRESETS.map((preset) => {
-          const isActive = preset.label === (activePreset?.label ?? (range.start || range.end ? undefined : 'Tot'))
-          return (
-            <button
-              key={preset.label}
-              type="button"
-              onClick={() => onChange(preset.range())}
-              className={`rounded-full px-2.5 py-1 transition-colors whitespace-nowrap ${
-                isActive
-                  ? 'bg-[var(--surface-2)] text-[var(--text-primary)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              {preset.label}
-            </button>
-          )
-        })}
-      </div>
+      <button
+        type="button"
+        onClick={() => onChange(ALL_TIME)}
+        className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+          allTimeActive
+            ? 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-primary)]'
+            : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+        }`}
+      >
+        Tot
+      </button>
       <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
         <input
           type="date"
