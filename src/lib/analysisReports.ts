@@ -35,10 +35,44 @@ export interface DailyAnalysis {
   sources: string[]
 }
 
+export interface WeeklyAnalysis {
+  schema_version: 1
+  week: string
+  generated_at: string
+  bot: 'R2-A'
+  status: AnalysisStatus
+  summary: string
+  coverage: {
+    start_date: string
+    end_date: string
+    expected_daily_reports: number
+    available_daily_reports: number
+  }
+  metrics: {
+    weekly_pnl: number | null
+    closed_operations: number | null
+    wins: number | null
+    losses: number | null
+    win_rate_pct: number | null
+    worst_floating: number | null
+    last_balance: number | null
+    last_equity: number | null
+  }
+  assessment: {
+    performance: string
+    risk: string
+    execution: string
+    conclusion: string
+  }
+  alerts: string[]
+  sources: string[]
+}
+
 const REPORTS_REPOSITORY = 'Gartecz/R2A-Analisis-Diaris'
 const TREE_URL = `https://api.github.com/repos/${REPORTS_REPOSITORY}/git/trees/main?recursive=1`
 const RAW_BASE = `https://raw.githubusercontent.com/${REPORTS_REPOSITORY}/main`
 const REPORT_PATH = /^analisis\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})\.json$/
+const WEEKLY_REPORT_PATH = /^setmanals\/(\d{4})\/(\d{4}-W\d{2})\.json$/
 
 interface GitHubTreeResponse {
   tree?: Array<{ path?: string; type?: string }>
@@ -52,6 +86,20 @@ function isDailyAnalysis(value: unknown): value is DailyAnalysis {
     report.bot === 'R2-A' &&
     typeof report.date === 'string' &&
     typeof report.summary === 'string' &&
+    Boolean(report.metrics) &&
+    Boolean(report.assessment)
+  )
+}
+
+function isWeeklyAnalysis(value: unknown): value is WeeklyAnalysis {
+  if (!value || typeof value !== 'object') return false
+  const report = value as Partial<WeeklyAnalysis>
+  return (
+    report.schema_version === 1 &&
+    report.bot === 'R2-A' &&
+    typeof report.week === 'string' &&
+    typeof report.summary === 'string' &&
+    Boolean(report.coverage) &&
     Boolean(report.metrics) &&
     Boolean(report.assessment)
   )
@@ -89,4 +137,29 @@ export async function fetchDailyAnalysesForMonth(
   return reports
     .filter((report): report is DailyAnalysis => report !== null)
     .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+export async function fetchWeeklyAnalyses(): Promise<WeeklyAnalysis[]> {
+  const treeResponse = await fetch(TREE_URL, { cache: 'no-store' })
+  if (!treeResponse.ok) throw new Error(`GitHub ha respost ${treeResponse.status}`)
+
+  const tree = (await treeResponse.json()) as GitHubTreeResponse
+  const weeks = (tree.tree ?? [])
+    .filter((entry) => entry.type === 'blob' && entry.path)
+    .map((entry) => entry.path?.match(WEEKLY_REPORT_PATH)?.[2] ?? null)
+    .filter((week): week is string => week !== null)
+
+  const reports = await Promise.all(
+    weeks.map(async (week) => {
+      const year = week.slice(0, 4)
+      const response = await fetch(`${RAW_BASE}/setmanals/${year}/${week}.json`, { cache: 'no-store' })
+      if (!response.ok) return null
+      const value: unknown = await response.json()
+      return isWeeklyAnalysis(value) ? value : null
+    }),
+  )
+
+  return reports
+    .filter((report): report is WeeklyAnalysis => report !== null)
+    .sort((a, b) => b.week.localeCompare(a.week))
 }
