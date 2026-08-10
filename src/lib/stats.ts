@@ -52,6 +52,25 @@ export interface WorstFloatingSeverity {
 // practice this bot runs one basket at a time. The % is relative to the
 // bot's own balance-scaled close threshold at that same moment (see
 // lib/floatingRisk.ts), so it stays meaningful as the account grows.
+// `history` must be sorted ascending by recordedAt (useAccountData.ts
+// queries it that way, and only ever appends newer rows). With floating
+// history now running into the tens of thousands of rows, scanning the
+// whole array per basket — and this runs once per *visible table row*,
+// every render — is the difference between an instant table and a
+// multi-second stall once the account has been live a few weeks. Binary
+// search for the window's edges, then only scan the (small) slice between
+// them.
+function lowerBound(history: FloatingPoint[], timeMs: number): number {
+  let lo = 0
+  let hi = history.length
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1
+    if (new Date(history[mid].recordedAt).getTime() < timeMs) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+
 export function worstFloatingDuringBasket(
   history: FloatingPoint[],
   basket: Basket,
@@ -59,10 +78,12 @@ export function worstFloatingDuringBasket(
   const openTime = Math.min(...basket.legs.map((l) => new Date(l.openTime).getTime()))
   const closeTime = new Date(basket.closeTime).getTime()
 
+  const start = lowerBound(history, openTime)
+  const end = lowerBound(history, closeTime + 1) // exclusive upper bound, closeTime inclusive
+
   let worst: FloatingPoint | null = null
-  for (const point of history) {
-    const t = new Date(point.recordedAt).getTime()
-    if (t < openTime || t > closeTime) continue
+  for (let i = start; i < end; i++) {
+    const point = history[i]
     if (worst === null || point.floatingPnl < worst.floatingPnl) worst = point
   }
   if (!worst) return null

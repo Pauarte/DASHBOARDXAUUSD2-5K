@@ -1,3 +1,9 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "crons": [
+    {
+      "path": "/api/analysis/v1/internal/generate-daily-snapshot",
+      "schedule": "30 23 * * *"
+    }
+  ]
 }

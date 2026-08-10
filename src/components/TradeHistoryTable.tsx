@@ -23,7 +23,18 @@ export function TradeHistoryTable({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(allBaskets.length / PAGE_SIZE))
-  const baskets = allBaskets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const pageBaskets = useMemo(
+    () => allBaskets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [allBaskets, page],
+  )
+  // worstFloatingDuringBasket scans floating history per basket - only
+  // worth paying for on the 20 rows actually on screen, and only when the
+  // page or the underlying data actually changes (not on every unrelated
+  // re-render, e.g. toggling a row open/closed or the currency switch).
+  const baskets = useMemo(
+    () => pageBaskets.map((basket) => ({ basket, worstFloating: worstFloatingDuringBasket(floatingHistory, basket) })),
+    [pageBaskets, floatingHistory],
+  )
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages))
@@ -62,14 +73,13 @@ export function TradeHistoryTable({
             </tr>
           </thead>
           <tbody>
-            {baskets.map((basket) => {
+            {baskets.map(({ basket, worstFloating }) => {
               const key = basket.legs.map((l) => l.id).join('-')
               const isOpen = expanded.has(key)
               const first = basket.legs[0]
               const totalLots = basket.legs.reduce((s, l) => s + l.lots, 0)
               const avgEntry =
                 basket.legs.reduce((s, l) => s + l.entryPrice * l.lots, 0) / (totalLots || 1)
-              const worstFloating = worstFloatingDuringBasket(floatingHistory, basket)
 
               return (
                 <Fragment key={key}>

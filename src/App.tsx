@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { buildDailyPnl, buildEquityCurve, computeStats } from './lib/stats'
 import { formatPercent, dashboardDateKey } from './lib/format'
 import { useCurrencyFormatter } from './lib/currency'
@@ -14,8 +14,6 @@ import {
 } from './lib/capitalPool'
 import { ALL_TIME, balanceAtRangeStart, filterByCloseTime, filterByRecordedAt, type DateRange } from './lib/dateRange'
 import { StatTile } from './components/StatTile'
-import { EquityCurveChart } from './components/EquityCurveChart'
-import { DailyPnlChart } from './components/DailyPnlChart'
 import { TradeHistoryTable } from './components/TradeHistoryTable'
 import { OpenPositionsCard } from './components/OpenPositionsCard'
 import { CalendarHeatmap } from './components/CalendarHeatmap'
@@ -25,6 +23,20 @@ import { DateRangeFilter } from './components/DateRangeFilter'
 import { useConnectionAlerts } from './lib/useConnectionAlerts'
 import { PasswordGate } from './components/PasswordGate'
 import type { PartnerIdentity } from './lib/partnersAuth'
+
+// Recharts alone accounts for most of this app's JS weight. The stats
+// tiles, table and connection status above don't need it at all, so
+// lazy-loading just these two keeps the numbers on screen instantly while
+// the chart chunk streams in behind them, instead of the whole page
+// waiting on a ~600kB chunk before anything is visible.
+const EquityCurveChart = lazy(() => import('./components/EquityCurveChart').then((m) => ({ default: m.EquityCurveChart })))
+const DailyPnlChart = lazy(() => import('./components/DailyPnlChart').then((m) => ({ default: m.DailyPnlChart })))
+
+function ChartSkeleton() {
+  return (
+    <div className="h-64 rounded-xl border border-[var(--border)] bg-[var(--surface-card)] animate-pulse" />
+  )
+}
 
 function App() {
   return (
@@ -315,9 +327,13 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           />
         </section>
 
-        <EquityCurveChart data={equityCurve} />
+        <Suspense fallback={<ChartSkeleton />}>
+          <EquityCurveChart data={equityCurve} />
+        </Suspense>
 
-        <DailyPnlChart data={dailyPnl} />
+        <Suspense fallback={<ChartSkeleton />}>
+          <DailyPnlChart data={dailyPnl} />
+        </Suspense>
 
         <CalendarHeatmap trades={filteredTrades} dailyPct={arteDailyPct} />
 
