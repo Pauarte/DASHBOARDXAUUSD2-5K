@@ -341,7 +341,7 @@ function Dashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout
           <div className="lg:col-span-2">
             <TradeHistoryTable trades={filteredTrades} floatingHistory={floatingHistory} />
           </div>
-          <OpenPositionsCard positions={openPositions} />
+          <OpenPositionsCard positions={openPositions} balance={account.balance} />
         </section>
       </main>
     </div>

@@ -1,6 +1,7 @@
 import type { OpenPosition } from '../lib/types'
 import { formatDateTime } from '../lib/format'
 import { useCurrencyFormatter } from '../lib/currency'
+import { floatingMaxForBalance } from '../lib/floatingRisk'
 
 // XAUUSD: 1 lot = 100 oz, so each $1 move in the gold price is $100 of
 // P&L per lot.
@@ -21,10 +22,24 @@ function breakEvenPrice(positions: OpenPosition[]): number | null {
   return positions[0].currentPrice - totalFloating / (USD_PER_LOT_PER_DOLLAR * netLots)
 }
 
-export function OpenPositionsCard({ positions }: { positions: OpenPosition[] }) {
+// The gold price at which the floating loss would hit the bot's own
+// balance-scaled auto-close threshold (lib/floatingRisk.ts — the level the
+// dashboard shows as −100%). The bot has no per-position SL order; this
+// threshold is its de facto basket-level stop, so showing the price it
+// maps to answers "how far can gold go against us before the bot cuts".
+function stopLossPrice(positions: OpenPosition[], balance: number): number | null {
+  const netLots = positions.reduce((s, p) => s + (p.direction === 'BUY' ? p.lots : -p.lots), 0)
+  if (Math.abs(netLots) < 1e-9 || balance <= 0) return null
+  const totalFloating = positions.reduce((s, p) => s + p.floatingPnl, 0)
+  const floatingAtStop = -floatingMaxForBalance(balance)
+  return positions[0].currentPrice + (floatingAtStop - totalFloating) / (USD_PER_LOT_PER_DOLLAR * netLots)
+}
+
+export function OpenPositionsCard({ positions, balance }: { positions: OpenPosition[]; balance: number }) {
   const formatCurrency = useCurrencyFormatter()
   const currentPrice = positions.length > 0 ? positions[0].currentPrice : null
   const bePrice = positions.length > 0 ? breakEvenPrice(positions) : null
+  const slPrice = positions.length > 0 ? stopLossPrice(positions, balance) : null
   const totalFloating = positions.reduce((s, p) => s + p.floatingPnl, 0)
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4">
@@ -46,6 +61,12 @@ export function OpenPositionsCard({ positions }: { positions: OpenPosition[] }) 
                 <span className="text-[var(--text-muted)]">Break-even</span>
                 <span className="tabular font-semibold">{bePrice.toFixed(2)} $</span>
               </div>
+              {slPrice !== null && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">SL (límit del bot)</span>
+                  <span className="tabular font-semibold text-[var(--critical)]">{slPrice.toFixed(2)} $</span>
+                </div>
+              )}
               {totalFloating < 0 && (
                 <div className="text-xs text-[var(--text-muted)]">
                   L’or ha de {bePrice > currentPrice ? 'pujar' : 'baixar'}{' '}
