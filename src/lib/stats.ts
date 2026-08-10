@@ -189,26 +189,14 @@ export function buildDailyPnl(trades: Trade[]): DailyPnl[] {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
-// Real balance recorded (via floating_pnl_snapshots) just before a given
-// day started — includes capital deposits/withdrawals, unlike simulating
-// forward from a fixed genesis balance. Falls back to startBalance for any
-// day before the first snapshot on record.
-function balanceBeforeDay(
-  history: { recordedAt: string; balance: number }[],
-  day: string,
-  fallback: number,
-): number {
-  let result = fallback
-  for (const point of history) {
-    if (dashboardDateKey(point.recordedAt) < day) result = point.balance
-  }
-  return result
-}
-
 // Each day's % return relative to the balance it actually started that day
 // with — read from real balance snapshots (so a partner deposit/withdrawal
 // on a previous day is correctly reflected), not simulated purely from
 // trade P&L, which would ignore capital movements and skew every % after one.
+// Both inputs are chronological (buildDailyPnl sorts, the history comes
+// ordered from the query), so "balance just before each day" is one merged
+// walk — the old version rescanned the entire history per day, which at
+// 12k+ snapshots × N days was a real contributor to freezing the UI.
 export function buildDailyReturnPct(
   trades: Trade[],
   startBalance: number,
@@ -216,13 +204,21 @@ export function buildDailyReturnPct(
 ): Map<string, number> {
   const daily = buildDailyPnl(trades)
   const pctByDay = new Map<string, number>()
+  let historyIndex = 0
+  let balanceBefore = startBalance
   for (const day of daily) {
+    while (
+      historyIndex < balanceHistory.length &&
+      dashboardDateKey(balanceHistory[historyIndex].recordedAt) < day.date
+    ) {
+      balanceBefore = balanceHistory[historyIndex].balance
+      historyIndex += 1
+    }
     // The market is closed weekends — any weekend "day" in here is stray
     // data (or a sync artifact), not a real trading day, and shouldn't
     // dilute the daily average.
     if (isWeekend(day.date)) continue
-    const dayStartBalance = balanceBeforeDay(balanceHistory, day.date, startBalance)
-    pctByDay.set(day.date, dayStartBalance > 0 ? (day.pnl / dayStartBalance) * 100 : 0)
+    pctByDay.set(day.date, balanceBefore > 0 ? (day.pnl / balanceBefore) * 100 : 0)
   }
   return pctByDay
 }

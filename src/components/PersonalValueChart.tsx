@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { PersonValuePoint } from '../lib/capitalPool'
 import { formatDateTime } from '../lib/format'
@@ -5,10 +6,28 @@ import { useCurrencyFormatter, useCurrencySymbolFormatter } from '../lib/currenc
 import { ChartTooltip } from './ChartTooltip'
 import { useThemeColors } from '../lib/useThemeColors'
 
-export function PersonalValueChart({ data }: { data: PersonValuePoint[] }) {
+// The value history has one point per sync pass (~every minute), which
+// after a few weeks is tens of thousands of points — far beyond what an
+// SVG chart can draw without freezing the tab, and far beyond what a
+// 220px-tall chart can visually convey anyway. Keep every Nth point plus
+// always the newest one; at ~2 points per rendered pixel nothing visible
+// is lost.
+const MAX_CHART_POINTS = 800
+
+export function PersonalValueChart({ data: fullData }: { data: PersonValuePoint[] }) {
   const colors = useThemeColors()
   const formatCurrency = useCurrencyFormatter()
   const formatAxisCurrency = useCurrencySymbolFormatter()
+
+  const data = useMemo(() => {
+    if (fullData.length <= MAX_CHART_POINTS) return fullData
+    const step = Math.ceil(fullData.length / MAX_CHART_POINTS)
+    const sampled = fullData.filter((_, index) => index % step === 0)
+    if (sampled[sampled.length - 1] !== fullData[fullData.length - 1]) {
+      sampled.push(fullData[fullData.length - 1])
+    }
+    return sampled
+  }, [fullData])
 
   if (data.length < 2) {
     return (

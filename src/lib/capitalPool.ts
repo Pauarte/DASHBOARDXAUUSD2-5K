@@ -147,15 +147,23 @@ export function personTodayChange(
 // (already-scaled) daily P&L — % relative to their own value at the start
 // of that day, not the whole bot's balance. Days before they joined have
 // $0 pnl already, so they correctly show 0%.
+// dailyPnl comes from buildDailyPnl (sorted ascending) and valueHistory is
+// chronological, so this is a single merged walk instead of rescanning the
+// whole (12k+ point) history once per day like valueBeforeDay would.
 export function personDailyReturnPct(
   dailyPnl: { date: string; pnl: number }[],
   valueHistory: PersonValuePoint[],
 ): Map<string, number> {
   const pctByDay = new Map<string, number>()
+  let historyIndex = 0
+  let valueBefore: number | null = null
   for (const day of dailyPnl) {
+    while (historyIndex < valueHistory.length && dashboardDateKey(valueHistory[historyIndex].time) < day.date) {
+      valueBefore = valueHistory[historyIndex].value
+      historyIndex += 1
+    }
     if (isWeekend(day.date)) continue
-    const startValue = valueBeforeDay(valueHistory, day.date)
-    pctByDay.set(day.date, startValue && startValue > 0 ? (day.pnl / startValue) * 100 : 0)
+    pctByDay.set(day.date, valueBefore && valueBefore > 0 ? (day.pnl / valueBefore) * 100 : 0)
   }
   return pctByDay
 }
