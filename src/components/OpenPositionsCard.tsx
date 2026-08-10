@@ -72,7 +72,7 @@ export function OpenPositionsCard({ positions, balance }: { positions: OpenPosit
               </div>
               {slPrice !== null && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">SL (límit del bot)</span>
+                  <span className="text-[var(--text-muted)]">SL</span>
                   <span className="tabular font-semibold text-[var(--critical)]">{slPrice.toFixed(2)} $</span>
                 </div>
               )}
