@@ -22,12 +22,21 @@ function breakEvenPrice(positions: OpenPosition[]): number | null {
   return positions[0].currentPrice - totalFloating / (USD_PER_LOT_PER_DOLLAR * netLots)
 }
 
+// The bot adds up to this many grid entries to a basket. Below that, a
+// projected SL price is misleading: as price moves against the basket the
+// bot will add more legs first, growing the lots and pulling the real
+// stop level closer — the number would look reassuringly far away right
+// up until it isn't. Only with the grid fully loaded is the exposure
+// fixed until close, making the projection honest.
+const MAX_BASKET_ENTRIES = 5
+
 // The gold price at which the floating loss would hit the bot's own
 // balance-scaled auto-close threshold (lib/floatingRisk.ts — the level the
 // dashboard shows as −100%). The bot has no per-position SL order; this
 // threshold is its de facto basket-level stop, so showing the price it
 // maps to answers "how far can gold go against us before the bot cuts".
 function stopLossPrice(positions: OpenPosition[], balance: number): number | null {
+  if (positions.length < MAX_BASKET_ENTRIES) return null
   const netLots = positions.reduce((s, p) => s + (p.direction === 'BUY' ? p.lots : -p.lots), 0)
   if (Math.abs(netLots) < 1e-9 || balance <= 0) return null
   const totalFloating = positions.reduce((s, p) => s + p.floatingPnl, 0)
