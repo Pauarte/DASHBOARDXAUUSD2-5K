@@ -37,13 +37,13 @@ export function OpenPositionsCard({ positions }: { positions: OpenPosition[] }) 
       {currentPrice !== null && (
         <div className="mb-3 rounded-lg bg-[var(--surface-2)] px-3 py-2.5 flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-[var(--text-muted)]">Or ara</span>
+            <span className="text-[var(--text-muted)]">Preu actual</span>
             <span className="tabular font-semibold">{currentPrice.toFixed(2)} $</span>
           </div>
           {bePrice !== null && (
             <>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--text-muted)]">Break-even a</span>
+                <span className="text-[var(--text-muted)]">Break-even</span>
                 <span className="tabular font-semibold">{bePrice.toFixed(2)} $</span>
               </div>
               {totalFloating < 0 && (
