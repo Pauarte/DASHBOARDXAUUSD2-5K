@@ -62,7 +62,10 @@ Copy-SafeTree $botDir (Join-Path $stage "bot_actiu")
 Write-Host "Copiant scripts i logs del sincronitzador sense secrets..."
 Get-ChildItem $syncDir -File -ErrorAction SilentlyContinue |
     Where-Object { Test-SafeFile $_ } |
-    ForEach-Object { Copy-Item $_.FullName (Join-Path $stage "sync" $_.Name) -Force }
+    ForEach-Object {
+        $syncTarget = Join-Path (Join-Path $stage "sync") $_.Name
+        Copy-Item $_.FullName $syncTarget -Force
+    }
 
 Write-Host "Exportant dades MT5 i Supabase en mode nomes lectura..."
 py -3 -m pip install -r (Join-Path $syncDir "requirements.txt") --disable-pip-version-check | Out-Null
