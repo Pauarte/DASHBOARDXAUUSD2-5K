@@ -18,12 +18,16 @@ export const supabase = isSupabaseConfigured ? createClient(url, anonKey) : null
 export async function fetchAllRows<T>(
   page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
   pageSize = 1000,
-  maxRows = 20000,
+  maxRows = Number.POSITIVE_INFINITY,
 ): Promise<T[]> {
   const rows: T[] = []
   for (let offset = 0; offset < maxRows; offset += pageSize) {
-    const { data, error } = await page(offset, offset + pageSize - 1)
-    if (error || !data) break
+    const pageEnd = Number.isFinite(maxRows)
+      ? Math.min(offset + pageSize, maxRows) - 1
+      : offset + pageSize - 1
+    const { data, error } = await page(offset, pageEnd)
+    if (error) throw error
+    if (!data) break
     rows.push(...data)
     if (data.length < pageSize) break
   }

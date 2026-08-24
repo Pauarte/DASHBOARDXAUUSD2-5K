@@ -176,7 +176,7 @@ export function personDailyReturnPct(
 export function scaleTradesForPerson(trades: Trade[], rows: ContributionRow[], personName: string): Trade[] {
   const sortedRows = [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
-  return trades.map((trade) => {
+  return trades.flatMap((trade) => {
     let totalUnits = 0
     let personUnits = 0
     for (const row of sortedRows) {
@@ -185,7 +185,10 @@ export function scaleTradesForPerson(trades: Trade[], rows: ContributionRow[], p
       if (row.personName === personName) personUnits += row.unitsDelta
     }
     const fraction = totalUnits > 0 ? personUnits / totalUnits : 0
-    return { ...trade, pnl: trade.pnl * fraction }
+    // A trade from before this person joined is not one of their trades.
+    // Keeping it with a synthetic $0 P&L distorted operation counts,
+    // break-evens and win rate on the personal dashboard.
+    return fraction > 0 ? [{ ...trade, pnl: trade.pnl * fraction }] : []
   })
 }
 

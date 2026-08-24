@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { supabase, isSupabaseConfigured, fetchAllRows } from '../lib/supabaseClient'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { useAccountData } from '../lib/useAccountData'
 import {
   computeStakes,
@@ -14,10 +14,10 @@ import {
   type ContributionType,
   type PersonStake,
 } from '../lib/capitalPool'
-import { buildDailyPnl, computeStats } from '../lib/stats'
+import { buildDailyPnl, groupIntoBaskets } from '../lib/stats'
 import { formatDateTime, formatPercent } from '../lib/format'
 import { useCurrencyFormatter } from '../lib/currency'
-import { ALL_TIME, balanceAtRangeStart, filterByCloseTime, filterByRecordedAt, type DateRange } from '../lib/dateRange'
+import { ALL_TIME, filterByCloseTime, type DateRange } from '../lib/dateRange'
 import type { PartnerIdentity } from '../lib/partnersAuth'
 import { StatTile } from '../components/StatTile'
 import { PersonalValueChart } from '../components/PersonalValueChart'
@@ -37,35 +37,16 @@ export function PartnersPage() {
 
 function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; onLogout: () => void }) {
   const formatCurrency = useCurrencyFormatter()
-  const { account, isLive, trades, openPositions } = useAccountData()
+  const { account, isLive, trades, openPositions, floatingHistory: balanceHistory } = useAccountData()
   const floatingTotal = openPositions.reduce((s, p) => s + p.floatingPnl, 0)
 
   const [rows, setRows] = useState<ContributionRow[]>([])
-  const [balanceHistory, setBalanceHistory] = useState<{ recordedAt: string; balance: number; floatingPnl: number }[]>(
-    [],
-  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // Every stat/chart below is scoped to this — defaults to all-time.
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME)
   const filteredTrades = useMemo(() => filterByCloseTime(trades, dateRange), [trades, dateRange])
-  const filteredBalanceHistory = useMemo(
-    () => filterByRecordedAt(balanceHistory, dateRange),
-    [balanceHistory, dateRange],
-  )
-  // The real balance the period actually started with, not the account's
-  // all-time genesis balance — otherwise a "last 7 days" filter would base
-  // % returns/drawdown off months of unrelated prior growth.
-  const periodStartBalance = useMemo(
-    () => balanceAtRangeStart(balanceHistory, dateRange, account.startBalance),
-    [balanceHistory, dateRange, account.startBalance],
-  )
-  const stats = useMemo(
-    () => computeStats(filteredTrades, periodStartBalance, filteredBalanceHistory),
-    [filteredTrades, periodStartBalance, filteredBalanceHistory],
-  )
-
   const [personName, setPersonName] = useState(identity.isAdmin ? '' : identity.personName)
   const [type, setType] = useState<ContributionType>('deposit')
   const [amount, setAmount] = useState('')
@@ -75,40 +56,16 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   async function load() {
     if (!supabase) return
     setLoading(true)
-    const [contributionsRes, balanceRes] = await Promise.all([
-      supabase
-        .from('capital_contributions')
-        .select('id, person_name, type, amount, pool_value_before, units_before, units_delta, note, created_at')
-        .order('created_at', { ascending: true }),
-      // Paged — a single .limit() silently caps at Supabase's max-rows
-      // (1000) once floating_pnl_snapshots grows past that, which was
-      // quietly cutting off the most recent history.
-      fetchAllRows<{ recorded_at: string; balance: string | number; floating_pnl: string | number }>((from, to) =>
-        supabase!
-          .from('floating_pnl_snapshots')
-          .select('recorded_at, balance, floating_pnl')
-          .order('recorded_at', { ascending: true })
-          .range(from, to),
-      ).then((data) => ({ data, error: null as unknown })),
-    ])
+    const contributionsRes = await supabase
+      .from('capital_contributions')
+      .select('id, person_name, type, amount, pool_value_before, units_before, units_delta, note, created_at')
+      .order('created_at', { ascending: true })
 
     if (contributionsRes.error) {
       setError(contributionsRes.error.message)
     } else {
       setRows(((contributionsRes.data as ContributionDbRow[] | null) ?? []).map(mapContributionRow))
       setError(null)
-    }
-    if (!balanceRes.error) {
-      setBalanceHistory(
-        (
-          (balanceRes.data as Array<{ recorded_at: string; balance: string | number; floating_pnl: string | number }> | null) ??
-          []
-        ).map((r) => ({
-          recordedAt: r.recorded_at,
-          balance: Number(r.balance),
-          floatingPnl: Number(r.floating_pnl),
-        })),
-      )
     }
     setLoading(false)
   }
@@ -133,13 +90,37 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
   )
   const myGainLoss = myStake ? myStake.currentValue - myStake.netContributed : 0
   const myTodayChange = myStake ? personTodayChange(myValueHistory, myStake.currentValue) : { pnl: 0, pct: 0 }
-  const myShare = myStake ? myStake.percentage / 100 : 0
   const myFloating = myStake ? (floatingTotal * myStake.percentage) / 100 : 0
   const myTrades = useMemo(
     () => scaleTradesForPerson(filteredTrades, rows, identity.personName),
     [filteredTrades, rows, identity.personName],
   )
   const dailyPnl = useMemo(() => buildDailyPnl(myTrades), [myTrades])
+  const personalBasketStats = useMemo(() => {
+    const personalPnlByClose = new Map(
+      groupIntoBaskets(myTrades).map((basket) => [basket.closeTime, basket.pnl]),
+    )
+    const baskets = groupIntoBaskets(filteredTrades).flatMap((basket) => {
+      const pnl = personalPnlByClose.get(basket.closeTime)
+      return pnl === undefined ? [] : [{ pnl, isWin: basket.isWin, isLoss: basket.isLoss }]
+    })
+    const wins = baskets.filter((basket) => basket.isWin)
+    const losses = baskets.filter((basket) => basket.isLoss)
+    const breakEvens = baskets.length - wins.length - losses.length
+    const decided = wins.length + losses.length
+
+    return {
+      total: baskets.length,
+      wins: wins.length,
+      losses: losses.length,
+      breakEvens,
+      winRate: decided > 0 ? (wins.length / decided) * 100 : 0,
+      best: baskets.length ? Math.max(...baskets.map((basket) => basket.pnl)) : 0,
+      worst: baskets.length ? Math.min(...baskets.map((basket) => basket.pnl)) : 0,
+      avgWin: wins.length ? wins.reduce((sum, basket) => sum + basket.pnl, 0) / wins.length : 0,
+      avgLoss: losses.length ? Math.abs(losses.reduce((sum, basket) => sum + basket.pnl, 0)) / losses.length : 0,
+    }
+  }, [filteredTrades, myTrades])
   const myDailyPct = useMemo(
     () => personDailyReturnPct(dailyPnl, myValueHistory),
     [dailyPnl, myValueHistory],
@@ -297,10 +278,10 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatTile
               label="Operacions tancades"
-              value={stats.totalTrades.toString()}
-              sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakEvens}BE`}
+              value={personalBasketStats.total.toString()}
+              sub={`${personalBasketStats.wins}W / ${personalBasketStats.losses}L / ${personalBasketStats.breakEvens}BE`}
             />
-            <StatTile label="Win rate" value={formatPercent(stats.winRate)} />
+            <StatTile label="Win rate" value={formatPercent(personalBasketStats.winRate)} />
             <StatTile
               label="Mitjana diària"
               value={formatPercent(myAvgDailyReturnPct, 2)}
@@ -308,13 +289,13 @@ function PartnersDashboard({ identity, onLogout }: { identity: PartnerIdentity; 
             />
             <StatTile
               label="Millor / pitjor cistella"
-              value={formatCurrency(stats.bestTrade * myShare, { signed: true })}
-              sub={formatCurrency(stats.worstTrade * myShare, { signed: true })}
+              value={formatCurrency(personalBasketStats.best, { signed: true })}
+              sub={formatCurrency(personalBasketStats.worst, { signed: true })}
             />
             <StatTile
               label="Mitjana guany / pèrdua"
-              value={formatCurrency(stats.avgWin * myShare, { signed: true })}
-              sub={formatCurrency(-stats.avgLoss * myShare, { signed: true })}
+              value={formatCurrency(personalBasketStats.avgWin, { signed: true })}
+              sub={formatCurrency(-personalBasketStats.avgLoss, { signed: true })}
             />
           </div>
           <DailyPnlChart data={dailyPnl} />
