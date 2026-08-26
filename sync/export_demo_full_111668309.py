@@ -87,7 +87,9 @@ def export_rates(name: str, timeframe: int, count: int) -> int:
 
 def export_recent_ticks() -> int:
     """Exporta ticks Bid/Ask recents per estudiar spread i execució."""
-    end = datetime.now(timezone.utc)
+    # Mateix marge que l'historial de deals: aquest terminal conserva l'hora
+    # del broker en alguns fluxos de ticks.
+    end = datetime.now(timezone.utc) + timedelta(hours=6)
     start = end - timedelta(days=TICK_LOOKBACK_DAYS)
     raw_ticks = mt5.copy_ticks_range(SYMBOL, start, end, mt5.COPY_TICKS_ALL)
     rows: list[dict[str, Any]] = []
