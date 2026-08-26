@@ -144,7 +144,10 @@ def main() -> None:
                 f"Wrong account. Expected {EXPECTED_LOGIN}, got {account.login}"
             )
 
-        to_date = datetime.now(timezone.utc)
+        # Alguns servidors MT5 etiqueten l'historial amb l'hora del broker
+        # com si fos UTC. Un marge cap endavant evita excloure tancaments
+        # acabats de produir; no modifica res del compte.
+        to_date = datetime.now(timezone.utc) + timedelta(hours=6)
         all_deals = records(mt5.history_deals_get(HISTORY_FROM, to_date))
         all_orders = records(mt5.history_orders_get(HISTORY_FROM, to_date))
         all_positions = records(mt5.positions_get())
