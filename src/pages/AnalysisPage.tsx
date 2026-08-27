@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   fetchAnalysisDates,
   fetchDailyAnalysesForMonth,
+  fetchWeeklyAnalyses,
   type DailyAnalysis,
+  type WeeklyAnalysis,
   type AnalysisStatus,
 } from '../lib/analysisReports'
 import { PasswordGate } from '../components/PasswordGate'
@@ -54,6 +56,7 @@ function AnalysisDashboard({ onLogout }: { onLogout: () => void }) {
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [datesLoaded, setDatesLoaded] = useState(false)
   const [reports, setReports] = useState<DailyAnalysis[]>([])
+  const [weeklyReports, setWeeklyReports] = useState<WeeklyAnalysis[]>([])
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(monthKey(new Date()))
   const [loading, setLoading] = useState(true)
@@ -72,6 +75,14 @@ function AnalysisDashboard({ onLogout }: { onLogout: () => void }) {
         setError(reason instanceof Error ? reason.message : 'No s’han pogut carregar els informes')
       })
       .finally(() => setDatesLoaded(true))
+  }, [])
+
+  useEffect(() => {
+    fetchWeeklyAnalyses()
+      .then(setWeeklyReports)
+      .catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : 'No s’han pogut carregar els informes setmanals')
+      })
   }, [])
 
   useEffect(() => {
@@ -103,6 +114,7 @@ function AnalysisDashboard({ onLogout }: { onLogout: () => void }) {
     [reports],
   )
   const selected = selectedDate ? reportsByDate.get(selectedDate) ?? null : null
+  const latestWeekly = weeklyReports[0] ?? null
   const [year, month] = selectedMonth.split('-').map(Number)
   const calendarDays = daysForMonth(selectedMonth)
 
@@ -133,6 +145,38 @@ function AnalysisDashboard({ onLogout }: { onLogout: () => void }) {
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-6">
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-5">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Resum setmanal</h2>
+              <p className="text-sm text-[var(--text-muted)]">
+                Es publica cada divendres després de l’informe diari.
+              </p>
+            </div>
+            {latestWeekly && (
+              <span className={`rounded-full border px-3 py-1 text-xs font-medium ${STATUS_CLASS[latestWeekly.status]}`}>
+                {latestWeekly.week} · {STATUS_LABEL[latestWeekly.status]}
+              </span>
+            )}
+          </div>
+
+          {latestWeekly ? (
+            <>
+              <p className="mb-4 text-sm leading-6 text-[var(--text-secondary)]">{latestWeekly.summary}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <ReportMetric label="P&L setmanal" value={metric(latestWeekly.metrics.weekly_pnl, ' $')} />
+                <ReportMetric label="Operacions" value={latestWeekly.metrics.closed_operations?.toString() ?? '—'} />
+                <ReportMetric label="Win rate" value={metric(latestWeekly.metrics.win_rate_pct, '%')} />
+                <ReportMetric label="Cobertura" value={`${latestWeekly.coverage.available_daily_reports}/${latestWeekly.coverage.expected_daily_reports} dies`} />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">
+              Encara no hi ha cap informe setmanal publicat. El primer es generarà divendres.
+            </p>
+          )}
+        </section>
+
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-5">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
